@@ -1,0 +1,514 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-03T22:27:29.116741+00:00",
+  "title": "Design System: Revisador",
+  "extensions": {
+    "colorMeta": {
+      "principal": {
+        "role": "primary",
+        "displayName": "Azul de acción",
+        "tonalRamp": [
+          "oklch(15.00% 0.19460 257.86)",
+          "oklch(26.43% 0.19460 257.86)",
+          "oklch(37.86% 0.19460 257.86)",
+          "oklch(49.29% 0.19460 257.86)",
+          "oklch(60.71% 0.19460 257.86)",
+          "oklch(72.14% 0.19460 257.86)",
+          "oklch(83.57% 0.19460 257.86)",
+          "oklch(95.00% 0.19460 257.86)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "lateral": {
+        "role": "neutral",
+        "displayName": "Gris de explorador",
+        "tonalRamp": [
+          "oklch(15.00% 0.00253 228.78)",
+          "oklch(26.43% 0.00253 228.78)",
+          "oklch(37.86% 0.00253 228.78)",
+          "oklch(49.29% 0.00253 228.78)",
+          "oklch(60.71% 0.00253 228.78)",
+          "oklch(72.14% 0.00253 228.78)",
+          "oklch(83.57% 0.00253 228.78)",
+          "oklch(95.00% 0.00253 228.78)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "texto": {
+        "role": "neutral",
+        "displayName": "Tinta principal",
+        "tonalRamp": [
+          "oklch(15.00% 0.00585 271.18)",
+          "oklch(26.43% 0.00585 271.18)",
+          "oklch(37.86% 0.00585 271.18)",
+          "oklch(49.29% 0.00585 271.18)",
+          "oklch(60.71% 0.00585 271.18)",
+          "oklch(72.14% 0.00585 271.18)",
+          "oklch(83.57% 0.00585 271.18)",
+          "oklch(95.00% 0.00585 271.18)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "principal-hover": {
+        "role": "primary",
+        "displayName": "Principal hover",
+        "tonalRamp": [
+          "oklch(15.00% 0.17561 257.82)",
+          "oklch(26.43% 0.17561 257.82)",
+          "oklch(37.86% 0.17561 257.82)",
+          "oklch(49.29% 0.17561 257.82)",
+          "oklch(60.71% 0.17561 257.82)",
+          "oklch(72.14% 0.17561 257.82)",
+          "oklch(83.57% 0.17561 257.82)",
+          "oklch(95.00% 0.17561 257.82)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "seleccion-texto": {
+        "role": "primary",
+        "displayName": "Seleccion texto",
+        "tonalRamp": [
+          "oklch(15.00% 0.16766 259.10)",
+          "oklch(26.43% 0.16766 259.10)",
+          "oklch(37.86% 0.16766 259.10)",
+          "oklch(49.29% 0.16766 259.10)",
+          "oklch(60.71% 0.16766 259.10)",
+          "oklch(72.14% 0.16766 259.10)",
+          "oklch(83.57% 0.16766 259.10)",
+          "oklch(95.00% 0.16766 259.10)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "seleccion-lateral": {
+        "role": "primary",
+        "displayName": "Seleccion lateral",
+        "tonalRamp": [
+          "oklch(15.00% 0.02767 258.37)",
+          "oklch(26.43% 0.02767 258.37)",
+          "oklch(37.86% 0.02767 258.37)",
+          "oklch(49.29% 0.02767 258.37)",
+          "oklch(60.71% 0.02767 258.37)",
+          "oklch(72.14% 0.02767 258.37)",
+          "oklch(83.57% 0.02767 258.37)",
+          "oklch(95.00% 0.02767 258.37)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "seleccion-suave": {
+        "role": "primary",
+        "displayName": "Seleccion suave",
+        "tonalRamp": [
+          "oklch(15.00% 0.02071 261.77)",
+          "oklch(26.43% 0.02071 261.77)",
+          "oklch(37.86% 0.02071 261.77)",
+          "oklch(49.29% 0.02071 261.77)",
+          "oklch(60.71% 0.02071 261.77)",
+          "oklch(72.14% 0.02071 261.77)",
+          "oklch(83.57% 0.02071 261.77)",
+          "oklch(95.00% 0.02071 261.77)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "seleccion-documento": {
+        "role": "primary",
+        "displayName": "Seleccion documento",
+        "tonalRamp": [
+          "oklch(15.00% 0.03883 257.92)",
+          "oklch(26.43% 0.03883 257.92)",
+          "oklch(37.86% 0.03883 257.92)",
+          "oklch(49.29% 0.03883 257.92)",
+          "oklch(60.71% 0.03883 257.92)",
+          "oklch(72.14% 0.03883 257.92)",
+          "oklch(83.57% 0.03883 257.92)",
+          "oklch(95.00% 0.03883 257.92)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "fondo": {
+        "role": "neutral",
+        "displayName": "Fondo",
+        "tonalRamp": [
+          "oklch(15.00% 0.00000 89.88)",
+          "oklch(26.43% 0.00000 89.88)",
+          "oklch(37.86% 0.00000 89.88)",
+          "oklch(49.29% 0.00000 89.88)",
+          "oklch(60.71% 0.00000 89.88)",
+          "oklch(72.14% 0.00000 89.88)",
+          "oklch(83.57% 0.00000 89.88)",
+          "oklch(95.00% 0.00000 89.88)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "superficie-suave": {
+        "role": "neutral",
+        "displayName": "Superficie suave",
+        "tonalRamp": [
+          "oklch(15.00% 0.00171 247.84)",
+          "oklch(26.43% 0.00171 247.84)",
+          "oklch(37.86% 0.00171 247.84)",
+          "oklch(49.29% 0.00171 247.84)",
+          "oklch(60.71% 0.00171 247.84)",
+          "oklch(72.14% 0.00171 247.84)",
+          "oklch(83.57% 0.00171 247.84)",
+          "oklch(95.00% 0.00171 247.84)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "superficie-hover": {
+        "role": "neutral",
+        "displayName": "Superficie hover",
+        "tonalRamp": [
+          "oklch(15.00% 0.00697 268.55)",
+          "oklch(26.43% 0.00697 268.55)",
+          "oklch(37.86% 0.00697 268.55)",
+          "oklch(49.29% 0.00697 268.55)",
+          "oklch(60.71% 0.00697 268.55)",
+          "oklch(72.14% 0.00697 268.55)",
+          "oklch(83.57% 0.00697 268.55)",
+          "oklch(95.00% 0.00697 268.55)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "secundario": {
+        "role": "neutral",
+        "displayName": "Secundario",
+        "tonalRamp": [
+          "oklch(15.00% 0.00939 253.91)",
+          "oklch(26.43% 0.00939 253.91)",
+          "oklch(37.86% 0.00939 253.91)",
+          "oklch(49.29% 0.00939 253.91)",
+          "oklch(60.71% 0.00939 253.91)",
+          "oklch(72.14% 0.00939 253.91)",
+          "oklch(83.57% 0.00939 253.91)",
+          "oklch(95.00% 0.00939 253.91)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "icono-suave": {
+        "role": "neutral",
+        "displayName": "Icono suave",
+        "tonalRamp": [
+          "oklch(15.00% 0.01037 242.93)",
+          "oklch(26.43% 0.01037 242.93)",
+          "oklch(37.86% 0.01037 242.93)",
+          "oklch(49.29% 0.01037 242.93)",
+          "oklch(60.71% 0.01037 242.93)",
+          "oklch(72.14% 0.01037 242.93)",
+          "oklch(83.57% 0.01037 242.93)",
+          "oklch(95.00% 0.01037 242.93)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "inactivo": {
+        "role": "neutral",
+        "displayName": "Inactivo",
+        "tonalRamp": [
+          "oklch(15.00% 0.01114 247.99)",
+          "oklch(26.43% 0.01114 247.99)",
+          "oklch(37.86% 0.01114 247.99)",
+          "oklch(49.29% 0.01114 247.99)",
+          "oklch(60.71% 0.01114 247.99)",
+          "oklch(72.14% 0.01114 247.99)",
+          "oklch(83.57% 0.01114 247.99)",
+          "oklch(95.00% 0.01114 247.99)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "borde-barra": {
+        "role": "neutral",
+        "displayName": "Borde barra",
+        "tonalRamp": [
+          "oklch(15.00% 0.00000 89.88)",
+          "oklch(26.43% 0.00000 89.88)",
+          "oklch(37.86% 0.00000 89.88)",
+          "oklch(49.29% 0.00000 89.88)",
+          "oklch(60.71% 0.00000 89.88)",
+          "oklch(72.14% 0.00000 89.88)",
+          "oklch(83.57% 0.00000 89.88)",
+          "oklch(95.00% 0.00000 89.88)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "borde-control": {
+        "role": "neutral",
+        "displayName": "Borde control",
+        "tonalRamp": [
+          "oklch(15.00% 0.00587 264.53)",
+          "oklch(26.43% 0.00587 264.53)",
+          "oklch(37.86% 0.00587 264.53)",
+          "oklch(49.29% 0.00587 264.53)",
+          "oklch(60.71% 0.00587 264.53)",
+          "oklch(72.14% 0.00587 264.53)",
+          "oklch(83.57% 0.00587 264.53)",
+          "oklch(95.00% 0.00587 264.53)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "borde-suave": {
+        "role": "neutral",
+        "displayName": "Borde suave",
+        "tonalRamp": [
+          "oklch(15.00% 0.00458 258.33)",
+          "oklch(26.43% 0.00458 258.33)",
+          "oklch(37.86% 0.00458 258.33)",
+          "oklch(49.29% 0.00458 258.33)",
+          "oklch(60.71% 0.00458 258.33)",
+          "oklch(72.14% 0.00458 258.33)",
+          "oklch(83.57% 0.00458 258.33)",
+          "oklch(95.00% 0.00458 258.33)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "borde-hover": {
+        "role": "semantic",
+        "displayName": "Borde hover",
+        "tonalRamp": [
+          "oklch(15.00% 0.04353 260.42)",
+          "oklch(26.43% 0.04353 260.42)",
+          "oklch(37.86% 0.04353 260.42)",
+          "oklch(49.29% 0.04353 260.42)",
+          "oklch(60.71% 0.04353 260.42)",
+          "oklch(72.14% 0.04353 260.42)",
+          "oklch(83.57% 0.04353 260.42)",
+          "oklch(95.00% 0.04353 260.42)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "api-verificada": {
+        "role": "semantic",
+        "displayName": "Api verificada",
+        "tonalRamp": [
+          "oklch(15.00% 0.15225 147.98)",
+          "oklch(26.43% 0.15225 147.98)",
+          "oklch(37.86% 0.15225 147.98)",
+          "oklch(49.29% 0.15225 147.98)",
+          "oklch(60.71% 0.15225 147.98)",
+          "oklch(72.14% 0.15225 147.98)",
+          "oklch(83.57% 0.15225 147.98)",
+          "oklch(95.00% 0.15225 147.98)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "exito-texto": {
+        "role": "semantic",
+        "displayName": "Exito texto",
+        "tonalRamp": [
+          "oklch(15.00% 0.12966 148.95)",
+          "oklch(26.43% 0.12966 148.95)",
+          "oklch(37.86% 0.12966 148.95)",
+          "oklch(49.29% 0.12966 148.95)",
+          "oklch(60.71% 0.12966 148.95)",
+          "oklch(72.14% 0.12966 148.95)",
+          "oklch(83.57% 0.12966 148.95)",
+          "oklch(95.00% 0.12966 148.95)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "exito-fondo": {
+        "role": "neutral",
+        "displayName": "Exito fondo",
+        "tonalRamp": [
+          "oklch(15.00% 0.01985 154.90)",
+          "oklch(26.43% 0.01985 154.90)",
+          "oklch(37.86% 0.01985 154.90)",
+          "oklch(49.29% 0.01985 154.90)",
+          "oklch(60.71% 0.01985 154.90)",
+          "oklch(72.14% 0.01985 154.90)",
+          "oklch(83.57% 0.01985 154.90)",
+          "oklch(95.00% 0.01985 154.90)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "error-texto": {
+        "role": "semantic",
+        "displayName": "Error texto",
+        "tonalRamp": [
+          "oklch(15.00% 0.17832 28.70)",
+          "oklch(26.43% 0.17832 28.70)",
+          "oklch(37.86% 0.17832 28.70)",
+          "oklch(49.29% 0.17832 28.70)",
+          "oklch(60.71% 0.17832 28.70)",
+          "oklch(72.14% 0.17832 28.70)",
+          "oklch(83.57% 0.17832 28.70)",
+          "oklch(95.00% 0.17832 28.70)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      },
+      "error-fondo": {
+        "role": "neutral",
+        "displayName": "Error fondo",
+        "tonalRamp": [
+          "oklch(15.00% 0.02207 24.44)",
+          "oklch(26.43% 0.02207 24.44)",
+          "oklch(37.86% 0.02207 24.44)",
+          "oklch(49.29% 0.02207 24.44)",
+          "oklch(60.71% 0.02207 24.44)",
+          "oklch(72.14% 0.02207 24.44)",
+          "oklch(83.57% 0.02207 24.44)",
+          "oklch(95.00% 0.02207 24.44)"
+        ],
+        "rampNote": "Rampa de previsualización sintetizada en OKLCH; no es una escala normativa ni añade colores al producto."
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Título de página",
+        "purpose": "Biblioteca académica o evaluaciones recientes; 23px en móvil."
+      },
+      "title": {
+        "displayName": "Marca",
+        "purpose": "Nombre Revisador inmediato al menú."
+      }
+    },
+    "shadows": [
+      {
+        "name": "crear",
+        "value": "0 1px 3px #3c404326",
+        "purpose": "Botón de preparación."
+      },
+      {
+        "name": "crear-hover",
+        "value": "0 2px 5px #3c404333",
+        "purpose": "Hover de preparación."
+      },
+      {
+        "name": "tarjeta",
+        "value": "0 1px 2px #20212414",
+        "purpose": "Tarjeta en reposo."
+      },
+      {
+        "name": "buscador-foco",
+        "value": "0 1px 5px #20212433",
+        "purpose": "Foco dentro del buscador."
+      },
+      {
+        "name": "buscador-movil",
+        "value": "0 2px 8px #20212433",
+        "purpose": "Búsqueda móvil desplegada."
+      },
+      {
+        "name": "ventana",
+        "value": "0 12px 40px #20212433",
+        "purpose": "Diálogo modal."
+      },
+      {
+        "name": "drawer",
+        "value": "4px 0 14px #2021241a",
+        "purpose": "Explorador móvil."
+      }
+    ],
+    "motion": [
+      {
+        "name": "estados",
+        "value": "background-color 150ms, box-shadow 150ms",
+        "purpose": "Botones, inputs y selects."
+      },
+      {
+        "name": "abrir-ventana",
+        "value": "180ms ease-out",
+        "purpose": "translateY(8px) y clip-path inferior a reposo; sin animación con movimiento reducido."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "movil-max",
+        "value": "760px"
+      },
+      {
+        "name": "compacto-max",
+        "value": "1100px"
+      },
+      {
+        "name": "amplio-min",
+        "value": "1600px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Acción primaria",
+      "kind": "button",
+      "refersTo": "boton-primario",
+      "description": "Acción de confirmación; conservar texto de progreso y estado deshabilitado.",
+      "html": "<button class=\"ds-primario\">Comprobar</button>",
+      "css": ".ds-primario{font-family:Inter,sans-serif;cursor:pointer;transition:background-color 150ms,box-shadow 150ms;background:var(--color-principal,#1a73e8);color:#fff;border:1px solid var(--color-principal,#1a73e8);border-radius:6px;padding:11px 18px;min-height:40px;font-size:12px;font-weight:500}.ds-primario:hover:not(:disabled){background:#1765cc;box-shadow:0 1px 3px #20212433}.ds-primario:focus-visible{outline:2px solid var(--color-principal,#1a73e8);outline-offset:3px;}.ds-primario:disabled{cursor:not-allowed;opacity:.55}"
+    },
+    {
+      "name": "Acción de contorno",
+      "kind": "button",
+      "refersTo": "boton-contorno",
+      "description": "Acción secundaria en paneles.",
+      "html": "<button class=\"ds-contorno\">Configurar API</button>",
+      "css": ".ds-contorno{font-family:Inter,sans-serif;cursor:pointer;transition:background-color 150ms,box-shadow 150ms;background:#fff;color:var(--color-principal,#1a73e8);border:1px solid #dadce0;border-radius:5px;padding:10px 14px;font-size:11px;font-weight:500}.ds-contorno:hover{background:#e8f0fe;border-color:#b8c9e5}.ds-contorno:focus-visible{outline:2px solid var(--color-principal,#1a73e8);outline-offset:3px;}"
+    },
+    {
+      "name": "Acción de texto",
+      "kind": "button",
+      "refersTo": "boton-texto",
+      "description": "Acción contextual del estado vacío; no simula creación integrada.",
+      "html": "<button class=\"ds-texto\">Ver cómo preparar una evaluación</button>",
+      "css": ".ds-texto{font-family:Inter,sans-serif;cursor:pointer;transition:background-color 150ms,box-shadow 150ms;background:none;border:0;color:var(--color-principal,#1a73e8);border-radius:5px;padding:10px 12px;font-size:12px;font-weight:500}.ds-texto:hover{background:#e8f0fe}.ds-texto:focus-visible{outline:2px solid var(--color-principal,#1a73e8);outline-offset:3px;}"
+    },
+    {
+      "name": "Campo de configuración",
+      "kind": "input",
+      "refersTo": "campo",
+      "description": "Etiqueta visible y foco azul; la clave nunca aparece como texto plano.",
+      "html": "<label class=\"ds-etiqueta\">Clave de API<input class=\"ds-campo\" type=\"password\" placeholder=\"Introduce tu clave de API\"></label>",
+      "css": ".ds-etiqueta{font-family:Inter,sans-serif;font-size:12px;font-weight:500;display:block}.ds-campo{font-family:Inter,sans-serif;display:block;width:100%;height:43px;margin-top:8px;background:#fff;color:var(--color-texto,#202124);border:1px solid #dadce0;border-radius:5px;padding:0 12px;font-size:13px;font-weight:400;caret-color:var(--color-principal,#1a73e8)}.ds-campo::placeholder{color:var(--color-secundario,#5f6368);opacity:1}.ds-campo:focus-visible{outline:2px solid var(--color-principal,#1a73e8);outline-offset:3px;}"
+    },
+    {
+      "name": "Navegación seleccionada",
+      "kind": "nav",
+      "refersTo": "navegacion-activa",
+      "description": "Fila lateral seleccionada; el SVG es una muestra de icono de línea autocontenida.",
+      "html": "<nav aria-label=\"Biblioteca\"><button class=\"ds-nav\" aria-current=\"page\"><svg width=\"19\" height=\"19\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M4 6v14M8 6v14M12 6v14M16 5l4 14\"/></svg>Mi biblioteca</button></nav>",
+      "css": ".ds-nav{font-family:Inter,sans-serif;cursor:pointer;transition:background-color 150ms,box-shadow 150ms;display:flex;align-items:center;gap:13px;width:100%;height:44px;padding:0 18px;border:0;border-radius:0 24px 24px 0;background:#dce8fa;color:#185abc;font-size:13px;font-weight:600;text-align:left}.ds-nav:hover{background:#e8eaed}.ds-nav:focus-visible{outline:2px solid var(--color-principal,#1a73e8);outline-offset:3px;}"
+    },
+    {
+      "name": "Etiqueta de evaluación",
+      "kind": "chip",
+      "refersTo": "etiqueta",
+      "description": "Estado informativo no interactivo; no requiere hover ni foco.",
+      "html": "<span class=\"ds-estado\">Borrador</span>",
+      "css": ".ds-estado{font-family:Inter,sans-serif;font-size:10px;color:var(--color-texto,#202124);background:var(--color-lateral,#f1f3f4);padding:4px 8px;border-radius:4px}"
+    },
+    {
+      "name": "Tarjeta de evaluación",
+      "kind": "card",
+      "refersTo": "tarjeta",
+      "description": "Muestra de composición, no registro real. No añade un hover que el código no implementa.",
+      "html": "<button class=\"ds-tarjeta\"><div class=\"ds-portada\"><svg width=\"35\" height=\"35\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8\"/></svg></div><div class=\"ds-datos\"><span class=\"ds-chip\">Borrador</span><h2>Título de evaluación</h2><p>Nombre del curso</p></div></button>",
+      "css": ".ds-tarjeta{font-family:Inter,sans-serif;cursor:pointer;transition:background-color 150ms,box-shadow 150ms;width:260px;max-width:100%;padding:0;background:#fff;color:var(--color-texto,#202124);border:1px solid #e0e0e0;border-radius:12px;box-shadow:0 1px 2px #20212414;overflow:hidden;text-align:left}.ds-portada{display:grid;place-items:center;min-height:110px;background:#f8f9fa;color:var(--color-secundario,#5f6368)}.ds-datos{padding:18px}.ds-chip{font-size:10px;background:var(--color-lateral,#f1f3f4);padding:4px 8px;border-radius:4px}.ds-datos h2{font-size:15px;font-weight:500;margin:12px 0 6px;overflow-wrap:anywhere}.ds-datos p{font-size:12px;color:var(--color-secundario,#5f6368);margin:0}.ds-tarjeta:focus-visible{outline:2px solid var(--color-principal,#1a73e8);outline-offset:3px;}.ds-tarjeta:disabled{opacity:1;cursor:not-allowed}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Biblioteca académica estilo Google Groups",
+    "overview": "Dirección visual fijada por el usuario y PRP-06, no una identidad nueva. Una biblioteca sin ruido: superficie blanca, explorador gris, azul funcional e iconos de línea. La densidad favorece encontrar y organizar evaluaciones; no convierte la pantalla en una landing page ni en un tablero de métricas ficticias.\n\nLa jerarquía se construye con alineación, espacio, tipografía contenida y estados explícitos. El criterio final pertenece al profesor. Este documento describe código existente, no promete que los flujos pendientes estén integrados.",
+    "keyCharacteristics": [
+      "Biblioteca sobria y operativa, con explorador académico persistente en escritorio.",
+      "Azul para acciones y selección; neutros para estructura y contenido.",
+      "Estados vacíos honestos, sin evaluaciones ni resultados inventados.",
+      "Inter autoalojada, controles etiquetados y foco visible."
+    ],
+    "rules": [
+      {
+        "name": "The Azul Funcional Rule",
+        "body": "Reservar el acento para acción, selección y foco; no teñir grandes áreas decorativas.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "**Do** preservar Google Groups: blanco, explorador gris, azul funcional y densidad contenida.",
+      "**Do** mantener nombres accesibles, foco visible, recorrido de teclado y retorno de foco en capas.",
+      "**Do** distinguir datos recibidos, vacío, búsqueda sin coincidencias y funciones pendientes.",
+      "**Do** ampliar la biblioteca mediante props y eventos sin introducir enrutamiento."
+    ],
+    "donts": [
+      "**Don't** inventar evaluaciones, notas, actividad o conexiones verificadas.",
+      "**Don't** presentar el CTA provisional como creación o procesamiento ya integrado.",
+      "**Don't** añadir una nueva identidad, métricas decorativas o tipografía ornamental.",
+      "**Don't** usar el color como única señal de estado ni eliminar el foco por estética."
+    ]
+  }
+}

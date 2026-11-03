@@ -1,0 +1,15 @@
+.venv/
+node_modules/
+dist/
+__pycache__/
+.pytest_cache/
+.env
+.env.local
+.vercel/
+.impeccable/review/
+*.pyc
+.playwright-cli/
+output/
+*.tsbuildinfo
+.agents/skills/
+.impeccable/estado-prueba.json

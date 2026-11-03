@@ -1,0 +1,14 @@
+.git/
+.venv/
+.env*
+.agents/
+.cursor/
+.vscode/
+.impeccable/
+.playwright-cli/
+node_modules/
+dist/
+pruebas/
+**/__pycache__/
+mcp.json
+docs/

@@ -1,0 +1,13 @@
+[project]
+name = "revisador"
+version = "0.1.0"
+description = "Calificación de exámenes con IA para profesores"
+requires-python = ">=3.12"
+dependencies = ["fastapi==0.162.0", "httpx==0.28.1", "openpyxl==3.1.5", "uvicorn==0.54.0", "tzdata==2026.6", "pillow==13.0.0", "pypdf==6.21.4", "python-docx==1.2.0", "python-multipart==0.0.33", "pypdfium2==5.14.0", "python-dotenv==1.2.4"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["pruebas"]
+
+[tool.fastapi]
+entrypoint = "presentacion.api:aplicacion"
