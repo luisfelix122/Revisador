@@ -44,6 +44,7 @@ export function Revisador() {
         const respuesta = await fetch("/api/sistema");
         if (!respuesta.ok) throw new Error("No se pudo conectar al servidor");
         const datos = await respuesta.json();
+        if (!vigente) return;
         const nuevo = crearCliente(datos.supabase_url, datos.clave_publicable, {
           auth: {
             storage: sessionStorage,
@@ -52,11 +53,11 @@ export function Revisador() {
             detectSessionInUrl: true,
           },
         });
-        if (!vigente) return;
         cambiarCliente(nuevo);
         const {
           data: { session },
         } = await nuevo.auth.getSession();
+        if (!vigente) return;
         if (vigente) {
           cambiarSesion(session);
           cargar(false);
@@ -106,50 +107,80 @@ export function Revisador() {
   }, [sesion?.user.id, actualizar]);
   const cerrarOrganizar = usarCallback(() => organizar(false), []),
     cerrarNueva = usarCallback(() => crear(false), []);
-  const cursos: Curso[] = anios.flatMap((a) =>
-    a.facultades.flatMap((f) =>
-      f.escuelas.flatMap((e) => e.promociones_ciclos.flatMap((c) => c.cursos)),
+  const cursos: Curso[] = (anios || []).flatMap((a) =>
+    (a.facultades || []).flatMap((f) =>
+      (f.escuelas || []).flatMap((e) =>
+        (e.promociones_ciclos || []).flatMap((c) => c.cursos || []),
+      ),
     ),
   );
-  const evaluaciones: EvaluacionResumen[] = cursos.flatMap((curso) =>
-    curso.evaluaciones.map((evaluacion) => {
-      const completados = evaluacion.examenes_estudiantes.filter(
-        (e) => e.estado_revision === "completado",
+  const evaluaciones: EvaluacionResumen[] = (cursos || []).flatMap((curso) =>
+    (curso.evaluaciones || []).map((evaluacion) => {
+      const completados = (evaluacion.examenes_estudiantes || []).filter(
+        (e) => e?.estado_revision === "completado",
       );
       return {
         id: evaluacion.id,
-        titulo: evaluacion.titulo,
-        curso: curso.nombre,
-        fecha: evaluacion.creado_en,
+        titulo: evaluacion.titulo || "",
+        curso: curso.nombre || "",
+        fecha: evaluacion.creado_en || new Date().toISOString(),
         cantidadExamenes: completados.length,
         promedio: completados.length
-          ? completados.reduce((suma, e) => suma + Number(e.nota_final), 0) /
+          ? completados.reduce((suma, e) => suma + Number(e?.nota_final || 0), 0) /
             completados.length
           : undefined,
         estado: evaluacion.estado === "borrador" ? "borrador" : "calificado",
       };
     }),
   );
-  const nodos: NodoAcademico[] = anios.map((a) => ({
+  const nodos: NodoAcademico[] = (anios || []).map((a) => ({
     id: a.id,
     nombre: String(a.anio),
-    hijos: a.facultades.map((f) => ({
+    hijos: (a.facultades || []).map((f) => ({
       id: f.id,
-      nombre: f.nombre,
-      hijos: f.escuelas.map((e) => ({
+      nombre: f.nombre || "",
+      hijos: (f.escuelas || []).map((e) => ({
         id: e.id,
-        nombre: e.nombre,
-        hijos: e.promociones_ciclos.map((c) => ({
+        nombre: e.nombre || "",
+        hijos: (e.promociones_ciclos || []).map((c) => ({
           id: c.id,
-          nombre: c.denominacion,
-          hijos: c.cursos.map((curso) => ({
+          nombre: c.denominacion || "",
+          hijos: (c.cursos || []).map((curso) => ({
             id: curso.id,
-            nombre: curso.nombre,
+            nombre: curso.nombre || "",
           })),
         })),
       })),
     })),
   }));
+  const evaluacionesFiltradas = usarMemo(() => {
+    if (!activo) return evaluaciones;
+    const cursoSeleccionado = cursos.find((c) => c.id === activo);
+    if (cursoSeleccionado) {
+      const ids = new Set((cursoSeleccionado.evaluaciones || []).map((x) => x.id));
+      return evaluaciones.filter((e) => ids.has(e.id));
+    }
+    const buscarCursosEnNodo = (nodo: NodoAcademico): string[] => {
+      if (nodo.id === activo) {
+        const recolectar = (n: NodoAcademico): string[] =>
+          !n.hijos || n.hijos.length === 0
+            ? [n.id]
+            : n.hijos.flatMap(recolectar);
+        return recolectar(nodo);
+      }
+      return (nodo.hijos || []).flatMap(buscarCursosEnNodo);
+    };
+    const idsCursos = new Set(nodos.flatMap(buscarCursosEnNodo));
+    if (idsCursos.size > 0) {
+      const cursosRama = cursos.filter((c) => idsCursos.has(c.id));
+      const idsEvaluaciones = new Set(
+        cursosRama.flatMap((c) => (c.evaluaciones || []).map((x) => x.id)),
+      );
+      return evaluaciones.filter((e) => idsEvaluaciones.has(e.id));
+    }
+    return evaluaciones;
+  }, [activo, evaluaciones, cursos, nodos]);
+
   const salir = async () => {
     if (!cliente) return;
     const { error } = await cliente.auth.signOut();
@@ -181,16 +212,7 @@ export function Revisador() {
       <Aplicacion
         nodos={nodos}
         activo={activo}
-        evaluaciones={
-          activo
-            ? evaluaciones.filter(
-                (e) =>
-                  cursos
-                    .find((c) => c.id === activo)
-                    ?.evaluaciones.some((x) => x.id === e.id) ?? true,
-              )
-            : evaluaciones
-        }
+        evaluaciones={evaluacionesFiltradas}
         alSeleccionar={(id) => {
           cambiarActivo(id);
           abrirEvaluacion(null);
@@ -222,8 +244,17 @@ export function Revisador() {
       />
       {error && (
         <div role="alert" className="aviso-global">
-          {error}
-          <button onClick={() => void actualizar()}>Reintentar</button>
+          <span>{error}</span>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+            <button onClick={() => void actualizar()}>Reintentar</button>
+            <button
+              className="cerrar-aviso"
+              onClick={() => mostrarError("")}
+              aria-label="Cerrar aviso"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
       {organizando && (
@@ -239,6 +270,10 @@ export function Revisador() {
           servicio={servicio}
           cursos={cursos}
           cerrar={cerrarNueva}
+          alOrganizar={() => {
+            crear(false);
+            organizar(true);
+          }}
           alCrear={(id) => {
             crear(false);
             abrirEvaluacion(id);

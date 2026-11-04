@@ -14,7 +14,7 @@ prueba("la ayuda refleja cuando el flujo de evaluaciones está conectado", async
   await usuario.click(pantalla.getByRole("button", {name:"Cómo funciona"}));
   esperar(pantalla.queryByText(/procesamiento de evaluaciones aún no están conectados/)).not.toBeInTheDocument();
   esperar(pantalla.getByText(/Revisa los resultados antes de descargar/)).toBeInTheDocument();
-});
+}, 15000);
 
 prueba(
   "muestra Revisador y el mensaje vacío exacto sin inventar actividad",

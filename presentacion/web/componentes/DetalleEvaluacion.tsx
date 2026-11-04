@@ -20,13 +20,9 @@ import {
 import { leerCredenciales } from "../servicios/credenciales";
 import { Ventana } from "./Ventana";
 
-interface Estimacion {
-  costo_usd: string;
+interface Preparacion {
   examenes: number;
-  paginas: number;
   huella: string;
-  modelo: string;
-  advertencia: string;
 }
 interface Propiedades {
   identificador: string;
@@ -38,6 +34,8 @@ const mensaje = (problema: unknown) =>
   problema instanceof Error
     ? problema.message
     : "No se pudo completar. Inténtalo otra vez.";
+const respuestaAusente = (respuesta: string) =>
+  ["", "nada"].includes(respuesta.trim().toLocaleLowerCase("es"));
 
 export function DetalleEvaluacion({
   identificador,
@@ -54,9 +52,7 @@ export function DetalleEvaluacion({
     [corriendo, correr] = usarEstado(false),
     [error, mostrarError] = usarEstado(""),
     [aviso, avisar] = usarEstado(""),
-    [entrada, cambiarEntrada] = usarEstado(""),
-    [salida, cambiarSalida] = usarEstado(""),
-    [estimacion, cambiarEstimacion] = usarEstado<Estimacion | null>(null),
+    [estimacion, cambiarEstimacion] = usarEstado<Preparacion | null>(null),
     [consentimiento, consentir] = usarEstado(false),
     [consentimientoAnalisis, consentirAnalisis] = usarEstado(false),
     [busqueda, buscar] = usarEstado(""),
@@ -66,13 +62,24 @@ export function DetalleEvaluacion({
   const configuracionEstimada = usarReferencia<{proveedor: string; clave_api: string; modelo: string} | null>(null);
   const cargar = usarCallback(async () => {
     const datos = await servicio.evaluacion(identificador);
-    cambiarEvaluacion(datos);
+    cambiarEvaluacion({
+      ...datos,
+      criterios_preguntas: datos.criterios_preguntas || [],
+      soluciones_profesor: Array.isArray(datos.soluciones_profesor)
+        ? datos.soluciones_profesor
+        : datos.soluciones_profesor ? [datos.soluciones_profesor] : [],
+      materiales_apoyo: datos.materiales_apoyo || [],
+      examenes_estudiantes: (datos.examenes_estudiantes || []).map((examen) => ({
+        ...examen,
+        detalles_preguntas: examen.detalles_preguntas || [],
+      })),
+    });
     cambiarRubrica(
-      [...datos.criterios_preguntas].sort(
+      [...(datos.criterios_preguntas || [])].sort(
         (a, b) => a.numero_pregunta - b.numero_pregunta,
       ),
     );
-    marcarGuardada(datos.criterios_preguntas.length > 0);
+    marcarGuardada((datos.criterios_preguntas || []).length > 0);
   }, [identificador, servicio]);
   usarEfecto(() => {
     void cargar().catch((problema) => mostrarError(mensaje(problema)));
@@ -80,6 +87,16 @@ export function DetalleEvaluacion({
       detener.current = true;
     };
   }, [cargar]);
+  const hayExamenEnProceso = evaluacion?.examenes_estudiantes.some(
+    (examen) => examen.estado_revision === "procesando",
+  ) ?? false;
+  usarEfecto(() => {
+    if (!hayExamenEnProceso || corriendo) return;
+    const intervalo = window.setInterval(() => {
+      void cargar().catch((problema) => mostrarError(mensaje(problema)));
+    }, 15000);
+    return () => window.clearInterval(intervalo);
+  }, [cargar, corriendo, hayExamenEnProceso]);
   const cerrarRevision = usarCallback(() => revisar(null), []);
   const invalidar = () => {
     configuracionEstimada.current = null;
@@ -159,23 +176,15 @@ export function DetalleEvaluacion({
       ocupar(false);
     }
   };
-  const estimar = async () => {
+  const preparar = async () => {
     ocupar(true);
     mostrarError("");
-    consentir(false);
+    invalidar();
     try {
       const configuracion = credenciales();
-      const resultado = await servicio.datos<Estimacion>(
-          `/evaluaciones/${identificador}/estimar`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              tarifa_entrada: entrada,
-              tarifa_salida: salida,
-              modelo: configuracion.modelo,
-            }),
-          },
-        );
+      const resultado = await servicio.datos<Preparacion>(
+        `/evaluaciones/${identificador}/preparar`, { method: "POST" },
+      );
       configuracionEstimada.current = configuracion;
       cambiarEstimacion(resultado);
     } catch (problema) {
@@ -196,7 +205,7 @@ export function DetalleEvaluacion({
     const anterior = configuracionEstimada.current;
     if (!anterior || anterior.proveedor !== configuracion.proveedor || anterior.modelo !== configuracion.modelo || anterior.clave_api !== configuracion.clave_api) {
       invalidar();
-      mostrarError("La configuración de IA cambió. Vuelve a estimar y confirmar el costo.");
+      mostrarError("La configuración de IA cambió. Vuelve a preparar la calificación.");
       return;
     }
     const parametros = {
@@ -273,7 +282,10 @@ export function DetalleEvaluacion({
         {error ? (
           <p className="error" role="alert">
             {error}
-            <button onClick={() => void cargar()}>Reintentar</button>
+            <button onClick={() => {
+              mostrarError("");
+              void cargar().catch((problema) => mostrarError(mensaje(problema)));
+            }}>Reintentar</button>
           </p>
         ) : (
           <p role="status">Cargando evaluación…</p>
@@ -296,8 +308,8 @@ export function DetalleEvaluacion({
           .toLocaleLowerCase("es")
           .includes(busqueda.toLocaleLowerCase("es")) &&
         (filtro === "todos" ||
-          (filtro === "aprobados" && e.nota_final >= 11) ||
-          (filtro === "desaprobados" && e.nota_final < 11) ||
+          (filtro === "aprobados" && e.nota_final >= 10.5) ||
+          (filtro === "desaprobados" && e.nota_final < 10.5) ||
           (filtro === "nada" && e.nombre_estudiante === "nada")),
     );
   return (
@@ -394,9 +406,9 @@ export function DetalleEvaluacion({
             </span>
           </label>
         </div>
-        {evaluacion.materiales_apoyo.length > 0 && (
+        {(evaluacion.materiales_apoyo || []).length > 0 && (
           <ul className="materiales">
-            {evaluacion.materiales_apoyo.map((m) => (
+            {(evaluacion.materiales_apoyo || []).map((m) => (
               <li key={m.id}>
                 {m.nombre_archivo} · {m.cantidad_paginas} página(s)
               </li>
@@ -525,7 +537,8 @@ export function DetalleEvaluacion({
                   cambiarRubrica([
                     ...rubrica,
                     {
-                      numero_pregunta: rubrica.length + 1,
+                      numero_pregunta: Array.from({ length: 100 }, (_, i) => i + 1)
+                        .find((numero) => !rubrica.some((p) => p.numero_pregunta === numero))!,
                       puntaje_maximo: 1,
                       respuesta_esperada: "",
                     },
@@ -579,84 +592,29 @@ export function DetalleEvaluacion({
         </div>
       </section>
       <section className="seccion-evaluacion">
-        <h2>Presupuesto y calificación del lote</h2>
+        <h2>Calificación de exámenes</h2>
         <p className="descripcion">
-          Se envían al proveedor los documentos, indicaciones y fotos. Confirma
-          que tienes autorización para tratar los datos de tus estudiantes. Las
-          claves permanecen solo en tu sesión.
-        </p>
-        <div className="campos-dobles">
-          <label>
-            Tarifa de entrada (USD / millón)
-            <input
-              type="number"
-              step="any"
-              min="0"
-              value={entrada}
-              onChange={(evento) => {
-                cambiarEntrada(evento.target.value);
-                invalidar();
-              }}
-            />
-          </label>
-          <label>
-            Tarifa de salida (USD / millón)
-            <input
-              type="number"
-              step="any"
-              min="0"
-              value={salida}
-              onChange={(evento) => {
-                cambiarSalida(evento.target.value);
-                invalidar();
-              }}
-            />
-          </label>
-        </div>
-        <p className="ayuda-campo">
-          Consulta la tarifa vigente del modelo elegido en tu proveedor. El
-          sistema no inventa precios para modelos sin tarifario verificado.
+          Antes de continuar, comprueba tu API, adjunta la solución y los exámenes,
+          y guarda la rúbrica. La calificación envía documentos al proveedor y puede consumir saldo.
         </p>
         <button
           className="boton-contorno"
-          disabled={
-            ocupado ||
-            corriendo ||
-            !guardada ||
-            entrada === "" ||
-            salida === "" ||
-            !apiVerificada ||
+          disabled={ocupado || corriendo || !guardada || !apiVerificada ||
             !evaluacion.soluciones_profesor.length ||
-            evaluacion.examenes_estudiantes.length === completados.length
-          }
-          onClick={() => void estimar()}
+            evaluacion.examenes_estudiantes.length === completados.length}
+          onClick={() => void preparar()}
         >
-          Estimar costo del lote
+          Preparar calificación
         </button>
         {estimacion && (
           <div className="resultado-costo">
-            <strong>
-              ${Number(estimacion.costo_usd).toFixed(4)} USD aprox.
-            </strong>
-            <span>
-              {estimacion.examenes} exámenes · {estimacion.paginas} páginas de
-              contexto · {estimacion.modelo}
-            </span>
-            <p>{estimacion.advertencia}</p>
+            <strong>{estimacion.examenes} {estimacion.examenes === 1 ? "examen pendiente" : "exámenes pendientes"}</strong>
+            <p>Se enviarán la solución, los materiales, las indicaciones y las fotos al proveedor seleccionado. La llamada puede consumir saldo.</p>
             <label className="casilla">
-              <input
-                type="checkbox"
-                checked={consentimiento}
-                onChange={(evento) => consentir(evento.target.checked)}
-              />
-              Acepto la estimación y autorizo el envío de estos documentos a mi
-              proveedor.
+              <input type="checkbox" checked={consentimiento} onChange={(evento) => consentir(evento.target.checked)} />
+              Autorizo el envío de estos documentos a mi proveedor y confirmo que puedo tratar los datos de mis estudiantes.
             </label>
-            <button
-              className="boton-primario"
-              disabled={!consentimiento || corriendo || ocupado}
-              onClick={() => void calificar()}
-            >
+            <button className="boton-primario" disabled={!consentimiento || corriendo || ocupado} onClick={() => void calificar()}>
               Confirmar y calificar lote
             </button>
           </div>
@@ -689,20 +647,11 @@ export function DetalleEvaluacion({
         ) &&
           !corriendo && (
             <p className="aviso">
-              Hay un examen en proceso. Actualiza el estado; si la conexión se
-              interrumpió, podrás reintentarlo después de 8 minutos. Un
+              Hay un examen en proceso. El estado se actualiza automáticamente;
+              si la conexión se interrumpió, podrás reintentarlo después de 8 minutos. Un
               reintento podría consumir saldo adicional.
             </p>
           )}
-        <button
-          className="boton-texto"
-          disabled={ocupado}
-          onClick={() =>
-            void cargar().catch((problema) => mostrarError(mensaje(problema)))
-          }
-        >
-          Actualizar estado
-        </button>
       </section>
       <section className="seccion-evaluacion">
         <div className="cabecera-detalle">
@@ -747,10 +696,10 @@ export function DetalleEvaluacion({
                 </dd>
               </div>
               <div>
-                <dt>Aprobados (≥11)</dt>
+                <dt>Aprobados (≥10,5)</dt>
                 <dd>
                   {Math.round(
-                    (completados.filter((e) => e.nota_final >= 11).length /
+                    (completados.filter((e) => e.nota_final >= 10.5).length /
                       completados.length) *
                       100,
                   )}
@@ -808,7 +757,7 @@ export function DetalleEvaluacion({
                       <td>{examen.codigo_estudiante}</td>
                       <td
                         className={
-                          examen.nota_final >= 11
+                          examen.nota_final >= 10.5
                             ? "nota-aprobada"
                             : "nota-desaprobada"
                         }
@@ -938,7 +887,14 @@ function RevisionExamen({
                 value={pregunta.respuesta_detectada}
                 maxLength={10000}
                 rows={3}
-                onChange={(evento) => cambiarPreguntas(preguntas.map((p, i) => i === indice ? { ...p, respuesta_detectada: evento.target.value } : p))}
+                onChange={(evento) => {
+                  const respuesta = evento.target.value;
+                  cambiarPreguntas(preguntas.map((p, i) => i === indice ? {
+                    ...p,
+                    respuesta_detectada: respuesta,
+                    puntaje_obtenido: respuestaAusente(respuesta) ? 0 : p.puntaje_obtenido,
+                  } : p));
+                }}
               />
             </label>
             <label>
@@ -949,6 +905,7 @@ function RevisionExamen({
                 max={pregunta.puntaje_maximo}
                 step="0.01"
                 required
+                disabled={respuestaAusente(pregunta.respuesta_detectada)}
                 value={pregunta.puntaje_obtenido}
                 onChange={(evento) =>
                   cambiarPreguntas(
@@ -964,6 +921,9 @@ function RevisionExamen({
                 }
               />
             </label>
+            {respuestaAusente(pregunta.respuesta_detectada) && (
+              <p className="ayuda-campo">Las respuestas sin contestar reciben cero puntos.</p>
+            )}
             <label>
               Justificación
               <textarea
@@ -1002,3 +962,4 @@ function RevisionExamen({
     </Ventana>
   );
 }
+

@@ -77,8 +77,11 @@ export function Configuracion({
             "El servidor devolvió una lista de modelos no válida.",
           );
         cambiarModelos(datos.modelos);
-        if (!datos.modelos.length)
+        if (!datos.modelos.length) {
           mostrarError("No hay modelos disponibles para esta clave.");
+        } else if (!credenciales.modelo || !datos.modelos.includes(credenciales.modelo)) {
+          actualizar({ modelo: datos.modelos[0] });
+        }
       }
       if (ruta === "comprobar-api") {
         if (datos?.verificada !== true)
@@ -191,11 +194,33 @@ export function Configuracion({
                     ? "Selecciona un modelo"
                     : "Primero carga los modelos disponibles"}
                 </option>
-                {modelos.map((modelo) => (
-                  <option key={modelo} value={modelo}>
-                    {modelo}
+                {credenciales.modelo && !modelos.includes(credenciales.modelo) && (
+                  <option value={credenciales.modelo}>
+                    {credenciales.modelo} (guardado)
                   </option>
-                ))}
+                )}
+                {modelos.map((modelo) => {
+                  const esRecomendado = [
+                    "gemini-flash-lite-latest",
+                    "gemini-3.6-flash",
+                    "gemini-3.5-flash-lite",
+                    "gemini-3-flash-preview",
+                  ].includes(modelo);
+                  const esAltaDemanda = [
+                    "gemini-3.8-flash",
+                    "gemini-flash-latest",
+                  ].includes(modelo);
+                  return (
+                    <option key={modelo} value={modelo}>
+                      {modelo}{" "}
+                      {esRecomendado
+                        ? "✨ (Recomendado y rápido con fotos)"
+                        : esAltaDemanda
+                          ? "⚡ (Último modelo - Alta demanda)"
+                          : ""}
+                    </option>
+                  );
+                })}
               </select>
             </label>
             <p className="ayuda-campo">

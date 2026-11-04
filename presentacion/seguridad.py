@@ -12,8 +12,10 @@ async def obtener_sesion(authorization: Annotated[str | None, Header()] = None) 
     try:
         async with httpx.AsyncClient(timeout=15, follow_redirects=False) as cliente:
             respuesta = await cliente.get(URL_SUPABASE + '/auth/v1/user', headers={'apikey': CLAVE_PUBLICABLE, 'Authorization': authorization})
-        if respuesta.status_code != 200:
+        if respuesta.status_code in (401, 403):
             raise HTTPException(401, 'Sesión no válida. Vuelve a iniciar sesión.')
+        if respuesta.status_code != 200:
+            raise HTTPException(503, 'No pudimos verificar tu sesión. Inténtalo otra vez.')
         datos = respuesta.json()
         return SesionProfesor(UUID(datos['id']), token)
     except (httpx.HTTPError, ValueError, KeyError):

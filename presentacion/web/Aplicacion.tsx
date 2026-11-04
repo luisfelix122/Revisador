@@ -1,5 +1,6 @@
 import {
   FolderOpen as CarpetaAbierta,
+  Folder as Carpeta,
   Menu,
   Settings as Ajustes,
   Search as Buscar,
@@ -92,17 +93,17 @@ export function Aplicacion({
   }, [busquedaAbierta]);
   const cerrar = usarCallback(() => configurar(false), []);
   const cerrarInformacion = usarCallback(() => informar(false), []);
-  const visibles = evaluaciones.filter(
+  const visibles = (evaluaciones || []).filter(
     (evaluacion) =>
-      `${evaluacion.titulo} ${evaluacion.curso}`
+      `${evaluacion.titulo || ""} ${evaluacion.curso || ""}`
         .toLocaleLowerCase("es")
-        .includes(busqueda.toLocaleLowerCase("es")) &&
+        .includes((busqueda || "").toLocaleLowerCase("es")) &&
       (tipo === "todas" || evaluacion.estado === tipo),
   );
   const ordenadas =
     seccion === "recientes"
       ? [...visibles].sort((primera, segunda) =>
-          segunda.fecha.localeCompare(primera.fecha),
+          (segunda.fecha || "").localeCompare(primera.fecha || ""),
         )
       : visibles;
   const nueva = () => {
@@ -246,6 +247,7 @@ export function Aplicacion({
               activo={activo}
               alSeleccionar={alSeleccionar}
               alRegresar={alRegresar}
+              alOrganizar={alOrganizar}
             />
             <div className="pie-lateral">
               <button
@@ -365,12 +367,14 @@ export function Aplicacion({
                       <div className="metadatos">
                         <span>{evaluacion.cantidadExamenes} exámenes</span>
                         <span>
-                          {new Date(evaluacion.fecha).toLocaleDateString(
-                            "es-PE",
-                            {
-                              timeZone: "America/Lima",
-                            },
-                          )}
+                          {evaluacion.fecha && !isNaN(new Date(evaluacion.fecha).getTime())
+                            ? new Date(evaluacion.fecha).toLocaleDateString(
+                                "es-PE",
+                                {
+                                  timeZone: "America/Lima",
+                                },
+                              )
+                            : ""}
                         </span>
                       </div>
                       {evaluacion.promedio !== undefined && (
@@ -395,12 +399,19 @@ export function Aplicacion({
                     ? "Prueba con otra búsqueda o cambia el filtro."
                     : "Todavía no hay archivos. Todo está vacío y sin tareas pendientes."}
                 </p>
-                <button className="boton-texto" onClick={nueva}>
-                  <Agregar size={17} />{" "}
-                  {alCrearEvaluacion
-                    ? "Crear mi primera evaluación"
-                    : "Ver cómo preparar una evaluación"}
-                </button>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
+                  <button className="boton-texto" onClick={nueva}>
+                    <Agregar size={17} />{" "}
+                    {alCrearEvaluacion
+                      ? "Crear mi primera evaluación"
+                      : "Ver cómo preparar una evaluación"}
+                  </button>
+                  {alOrganizar && (
+                    <button className="boton-texto" onClick={alOrganizar}>
+                      <Carpeta size={17} /> Organizar cursos y facultades
+                    </button>
+                  )}
+                </div>
                 {!alCrearEvaluacion && (
                   <p className="alcance-creacion">
                     Creación de evaluaciones: próximamente.

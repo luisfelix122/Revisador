@@ -7,11 +7,13 @@ export function NuevaEvaluacion({
   cursos,
   cerrar,
   alCrear,
+  alOrganizar,
 }: {
   servicio: ServicioBiblioteca;
   cursos: Curso[];
   cerrar: () => void;
   alCrear: (id: string) => void;
+  alOrganizar?: () => void;
 }) {
   const [curso, cambiarCurso] = usarEstado(""),
     [titulo, cambiarTitulo] = usarEstado(""),
@@ -58,10 +60,24 @@ export function NuevaEvaluacion({
           </select>
         </label>
         {!cursos.length && (
-          <p className="aviso">
-            Primero crea un año, facultad, escuela, ciclo y curso desde
-            «Organizar biblioteca».
-          </p>
+          <div style={{ margin: "10px 0", padding: "12px", background: "#f8f9fa", border: "1px solid #dadce0", borderRadius: "8px" }}>
+            <p style={{ margin: "0 0 10px 0", fontSize: "14px", color: "#5f6368" }}>
+              Aún no tienes cursos creados en tu biblioteca académica.
+            </p>
+            {alOrganizar && (
+              <button
+                type="button"
+                className="boton-primario"
+                style={{ fontSize: "13px", padding: "6px 12px" }}
+                onClick={() => {
+                  cerrar();
+                  alOrganizar();
+                }}
+              >
+                + Crear o cargar cursos de ejemplo
+              </button>
+            )}
+          </div>
         )}
         <label>
           Título de la evaluación

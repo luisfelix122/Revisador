@@ -4,6 +4,7 @@ import {
 } from "@testing-library/react";
 import { expect as esperar, test as prueba, vi as simular } from "vitest";
 import { Revisador } from "../Revisador";
+import { Aplicacion } from "../Aplicacion";
 
 prueba(
   "el flujo privado comienza con acceso docente y no expone evaluaciones",
@@ -33,5 +34,24 @@ prueba(
     } finally {
       peticion.mockRestore();
     }
+  },
+);
+
+prueba(
+  "la aplicacion tolera cursos y nodos recien creados con evaluaciones nulas",
+  () => {
+    esperar(() => {
+      representar(
+        <Aplicacion
+          evaluaciones={[]}
+          nodos={[
+            {
+              id: "c-1",
+              nombre: "Curso Nuevo",
+            },
+          ]}
+        />,
+      );
+    }).not.toThrow();
   },
 );

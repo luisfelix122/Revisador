@@ -43,6 +43,8 @@ class ExtraerDocumento:
                 if lector.is_encrypted or not 1 <= len(lector.pages) <= 20:
                     raise ValueError('El PDF debe tener de 1 a 20 páginas y no estar cifrado')
                 texto = '\n'.join(pagina.extract_text() or '' for pagina in lector.pages)
+                if len(texto) > 80000:
+                    raise ValueError('El PDF supera 80.000 caracteres')
                 imagenes = []
                 with pdfium.PdfDocument(contenido) as documento:
                     for pagina in documento:
@@ -52,7 +54,7 @@ class ExtraerDocumento:
                         mapa = pagina.render(scale=min(2,1800/max(ancho,alto)))
                         imagenes.append(convertir_imagen(mapa.to_pil()))
                         mapa.close(); pagina.close()
-                return DocumentoExtraido('pdf',len(lector.pages),texto[:80000],tuple(imagenes))
+                return DocumentoExtraido('pdf',len(lector.pages),texto,tuple(imagenes))
             if extension == '.docx':
                 with ZipFile(BytesIO(contenido)) as paquete:
                     entradas = paquete.infolist()
@@ -71,7 +73,10 @@ class ExtraerDocumento:
                         raise ValueError('El Word no contiene texto ni imágenes legibles')
                     if len(texto)>80000:
                         raise ValueError('El Word supera 80.000 caracteres')
-                    return DocumentoExtraido('word', max(1,len(imagenes),(len(texto)+2999)//3000),texto,tuple(imagenes))
+                    paginas = max(1,len(imagenes),(len(texto)+2999)//3000)
+                    if paginas > 20:
+                        raise ValueError('El Word supera 20 páginas estimadas')
+                    return DocumentoExtraido('word',paginas,texto,tuple(imagenes))
         except (ValueError, BadZipFile, OSError, Exception) as error:
             if isinstance(error, ValueError):
                 raise

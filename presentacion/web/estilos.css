@@ -679,7 +679,7 @@ h1 {
 .velo {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 100;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1098,19 +1098,35 @@ input[type="checkbox"] {
   bottom: 24px;
   left: 24px;
   right: 24px;
-  z-index: 60;
-  padding: 18px;
+  z-index: 40;
+  padding: 16px 20px;
   background: #fce8e6;
   color: #b3261e;
   box-shadow: 0 3px 12px #20212426;
   border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 .aviso-global button {
-  margin-left: 16px;
   border: 0;
   background: none;
   text-decoration: underline;
   color: inherit;
+  cursor: pointer;
+  font-weight: 500;
+}
+.aviso-global .cerrar-aviso {
+  text-decoration: none;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0.8;
+}
+.aviso-global .cerrar-aviso:hover {
+  opacity: 1;
+  background: #f8d7da;
 }
 .detalle {
   padding-bottom: 32px;

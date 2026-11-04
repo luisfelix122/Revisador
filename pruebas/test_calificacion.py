@@ -33,3 +33,7 @@ def test_debe_rechazar_preguntas_duplicadas_en_un_examen():
 def test_puntajes_con_mas_de_dos_decimales_no_deben_redondearse_silenciosamente():
     with pytest.raises(ValueError):
         DetallePregunta(1,Decimal('0.001'),Decimal('4'),'Respuesta','Parcial')
+def test_respuesta_nada_con_espacios_o_mayusculas_no_obtiene_puntos():
+    pregunta = DetallePregunta(1, Decimal('4'), Decimal('5'), ' Nada ', 'Sin respuesta')
+    assert pregunta.respuesta_detectada == 'nada'
+    assert pregunta.puntaje_obtenido == Decimal('0')

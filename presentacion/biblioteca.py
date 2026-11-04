@@ -1,8 +1,9 @@
 from typing import Annotated
 from typing import Literal
+from decimal import Decimal
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from infraestructura.supabase import RepositorioSupabase
 from presentacion.seguridad import obtener_repositorio
 
@@ -46,6 +47,14 @@ class NuevaEvaluacion(BaseModel):
     titulo: str = Field(min_length=1, max_length=255)
     indicaciones_profesor: str = Field(default='', max_length=10000)
     puntaje_total_maximo: float = Field(default=20, gt=0, le=100, allow_inf_nan=False)
+
+    @field_validator('puntaje_total_maximo')
+    @classmethod
+    def validar_decimales(cls, puntaje: float) -> float:
+        valor = Decimal(str(puntaje))
+        if valor != valor.quantize(Decimal('0.01')):
+            raise ValueError('Usa como máximo dos decimales en el puntaje')
+        return puntaje
 
 
 @enrutador.post('/evaluaciones')

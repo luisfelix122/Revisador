@@ -63,3 +63,13 @@ def test_debe_descargar_excel_por_http():
     assert respuesta.status_code == 200
     assert respuesta.content[:2] == b'PK'
     assert 'spreadsheetml' in respuesta.headers['content-type']
+
+
+def test_error_openai_no_recomienda_modelos_de_google(monkeypatch):
+    async def responder(cliente, metodo, url, **opciones):
+        return httpx.Response(503, json={'error':'fallo temporal'})
+    monkeypatch.setattr(httpx.AsyncClient, 'request', responder)
+    respuesta = TestClient(aplicacion).post('/api/configuracion/modelos', json={'proveedor':'openai','clave_api':'clave-prueba'})
+    assert respuesta.status_code == 502
+    assert 'Google' not in respuesta.text
+    assert 'gemini' not in respuesta.text.lower()

@@ -13,3 +13,7 @@ output/
 *.tsbuildinfo
 .agents/skills/
 .impeccable/estado-prueba.json
+.impeccable/
+.cursor/
+.vscode/
+mcp.json

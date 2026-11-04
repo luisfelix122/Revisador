@@ -19,7 +19,7 @@ class DetallePregunta:
             raise ValueError('Usa como máximo dos decimales en los puntajes')
         if not Decimal("0") <= self.puntaje_obtenido <= self.puntaje_maximo:
             raise ValueError("El puntaje debe estar entre cero y el máximo")
-        if not self.respuesta_detectada.strip():
+        if self.respuesta_detectada.strip().casefold() in ('', 'nada'):
             object.__setattr__(self, "respuesta_detectada", "nada")
         if self.respuesta_detectada == "nada":
             object.__setattr__(self, "puntaje_obtenido", Decimal("0"))

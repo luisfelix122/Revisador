@@ -22,3 +22,9 @@ def test_debe_rechazar_rubricas_con_maximos_distintos_para_la_misma_pregunta():
     examenes = tuple(ExamenEstudiante("Ana", "01", (DetallePregunta(1, Decimal("1"), Decimal(maximo), "Respuesta", "Parcial"),), "") for maximo in ("4", "5"))
     with pytest.raises(ValueError, match="rúbrica"):
         GeneradorExcel().generar({}, examenes)
+
+
+def test_excel_aprueba_desde_diez_punto_cinco():
+    examen = ExamenEstudiante("Ana", "01", (DetallePregunta(1, Decimal("10.5"), Decimal("20"), "Respuesta", "Correcta"),), "")
+    hoja = load_workbook(BytesIO(GeneradorExcel().generar({}, (examen,))))["Acta_de_Notas"]
+    assert hoja["E13"].value == '=COUNTIF(E8:E8,">=10.5")'

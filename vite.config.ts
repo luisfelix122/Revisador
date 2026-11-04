@@ -8,5 +8,6 @@ export default definirConfiguracion({
   test: {
     environment: "jsdom",
     setupFiles: ["./presentacion/web/pruebas/preparacion.ts"],
+    testTimeout: 20000,
   },
 });

@@ -50,4 +50,11 @@ class RepositorioSupabase:
         filas = await self.solicitar('GET', f'/rest/v1/evaluaciones?id=eq.{identificador}&select=*,cursos(*,promociones_ciclos(*,escuelas(*,facultades(*,anios_academicos(*))))),soluciones_profesor(*),materiales_apoyo(*),criterios_preguntas(*),examenes_estudiantes(*,detalles_preguntas(*))')
         if not filas:
             raise ErrorPersistencia('Evaluación no encontrada en tu biblioteca.', 404)
-        return filas[0]
+        evaluacion = filas[0]
+        solucion = evaluacion.get('soluciones_profesor')
+        evaluacion['soluciones_profesor'] = solucion if isinstance(solucion, list) else [solucion] if solucion else []
+        for relacion in ('materiales_apoyo', 'criterios_preguntas', 'examenes_estudiantes'):
+            evaluacion[relacion] = evaluacion.get(relacion) or []
+        for examen in evaluacion['examenes_estudiantes']:
+            examen['detalles_preguntas'] = examen.get('detalles_preguntas') or []
+        return evaluacion
