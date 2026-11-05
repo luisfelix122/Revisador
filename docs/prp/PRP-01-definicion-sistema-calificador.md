@@ -98,6 +98,12 @@ CREATE TABLE evaluaciones (
     titulo VARCHAR(255) NOT NULL, -- Ej: 'Examen Parcial', 'Práctica Calificada 1'
     indicaciones_profesor TEXT, -- Cuadro de texto libre con directrices
     puntaje_total_maximo NUMERIC(5, 2) NOT NULL DEFAULT 20.00,
+    token_recepcion UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    recepcion_abierta BOOLEAN NOT NULL DEFAULT true,
+    tiempo_limite_minutos INT,
+    fecha_cierre_programada TIMESTAMP WITH TIME ZONE,
+    permitir_reenvios_global BOOLEAN NOT NULL DEFAULT false,
+    cantidad_estudiantes_esperados INT DEFAULT NULL CHECK (cantidad_estudiantes_esperados IS NULL OR cantidad_estudiantes_esperados > 0),
     creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -127,14 +133,28 @@ CREATE TABLE examenes_estudiantes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     evaluacion_id UUID NOT NULL REFERENCES evaluaciones(id) ON DELETE CASCADE,
     nombre_estudiante VARCHAR(255) NOT NULL DEFAULT 'nada',
-    codigo_estudiante VARCHAR(100) DEFAULT 'nada',
+    codigo_estudiante VARCHAR(100) NOT NULL DEFAULT 'nada',
     ruta_imagen_examen VARCHAR(500) NOT NULL,
+    numero_entregas INT NOT NULL DEFAULT 1,
+    permitir_reenvio BOOLEAN NOT NULL DEFAULT false,
     nota_final NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
     observaciones_generales TEXT,
-    creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT uq_examen_estudiante_evaluacion UNIQUE (evaluacion_id, codigo_estudiante)
 );
 
--- 10. Detalle por Pregunta (Atómico, 3NF estricto)
+-- 10. Historial Inmutable de Entregas (Auditoría 3NF)
+CREATE TABLE historial_entregas_estudiantes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    examen_estudiante_id UUID NOT NULL REFERENCES examenes_estudiantes(id) ON DELETE CASCADE,
+    numero_entrega INT NOT NULL,
+    ruta_archivo VARCHAR(500) NOT NULL,
+    motivo_reenvio TEXT,
+    creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT uq_historial_examen_entrega UNIQUE (examen_estudiante_id, numero_entrega)
+);
+
+-- 11. Detalle por Pregunta (Atómico, 3NF estricto)
 CREATE TABLE detalles_preguntas (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     examen_estudiante_id UUID NOT NULL REFERENCES examenes_estudiantes(id) ON DELETE CASCADE,
@@ -184,21 +204,51 @@ CREATE TABLE detalles_preguntas (
 - **Área Principal**: Tarjetas con sombras sutiles (`shadow-sm`) para el historial de evaluaciones, o **Estado Vacío (Empty State)** centrado con icono gris grande y texto exacto:
   > *"Todavía no hay archivos. Todo está vacío y sin tareas pendientes."*
 
+### 3.5. Módulo de Recepción Autónoma de Alumnos e Historial Inmutable
+- **Modalidad Dual por Pestañas**:
+  - *"Carga docente (manual)"*: Módulo original para que el profesor suba directamente solución, materiales y fotos de alumnos.
+  - *"Recepción de alumnos"*: Módulo autónomo donde los alumnos suben sus propios exámenes y el profesor gestiona la recepción en vivo.
+- **Enlace Público y WhatsApp**: Generación de URL `/?entrega=<token>` con botones para copiar enlace y mensaje preformateado para WhatsApp. Los alumnos ingresan desde su teléfono sin registro.
+- **Control Estricto de Duplicados en BD**: Restricción de unicidad relacional `(evaluacion_id, lower(trim(codigo_estudiante)))`. Un estudiante no puede volver a enviar su examen a menos que el docente lo autorice.
+- **Control de Permisos de Reenvío por el Docente**:
+  - *Individual*: Interruptor en la fila del estudiante para permitirle reenviar.
+  - *Grupal*: Opción para habilitar reenvíos a toda la sección en caso de incidencias generales.
+- **Control de Aforo y Alumnos Presentes en el Aula**:
+  - El docente fija de manera previa o dinámica la cantidad de estudiantes que van a dar el examen (`cantidad_estudiantes_esperados`).
+  - El sistema bloquea de inmediato nuevos envíos una vez alcanzada la cuota física del salón, impidiendo que estudiantes ausentes o que no asistieron envíen fotos desde el exterior con el enlace compartido.
+  - Si un estudiante ya entregó y recibe permiso de reenvío, su reenvío está garantizado y no consume vacantes adicionales del aforo.
+  - Indicador de estado en tiempo real en la pantalla del profesor (`X / Y alumnos presentes`).
+  - Notificación visual en el portal del alumno informando cordialmente si el cupo fue completado.
+- **Historial Inmutable de Entregas (Auditoría 3NF)**: Cada reenvío genera una copia inmutable en `historial_entregas_estudiantes` con número de entrega (`Entrega #1`, `Entrega #2`, etc.) y marca temporal. El docente puede consultar y comparar todas las versiones para verificar qué cambió.
+- **Control de Tiempo en el Aula**:
+  - Botones *"Cerrar entregas ahora"* y *"Reabrir entregas"* para controlar el aula en tiempo real.
+  - Temporizador con cuenta regresiva programada. Reabrir las entregas no elimina las fotos ya entregadas.
+- **Previsualización y Rotación Interactiva (90°)**:
+  - Estudiante: Vista previa antes de confirmar con rotación 90° interactiva y comprobante de entrega digital.
+  - Docente: Visor con rotación (0°, 90°, 180°, 270°), controles de zoom (1x a 3x) y selector de entregas históricas.
+- **Revisión por Lotes e Individual**:
+  - *"Revisar solo pendientes"*: Califica exámenes que no han sido completados.
+  - *"Revisar a todos"*: Recalifica todo el lote.
+  - *"Revisar seleccionados"*: Califica los estudiantes seleccionados mediante casillas.
+  - Botón individual *"Revisar examen"*: Abre la ventana dividida con imagen y justificaciones por pregunta.
+- **Jerarquía Académica Visible**: Muestra en la cabecera `Año` › `Facultad` › `Escuela` › `Ciclo` › `Curso`.
+- **Estilo sin Emojis**: Iconos SVG con `lucide-react`.
+
 ---
 
 ## 4. Flujo Operativo Completo
 
-1. **Configuración Previa**: El profesor ingresa la API Key, elige el modelo y presiona **"Comprobar"** hasta ver el **check verde**.
-2. **Navegación / Creación en Biblioteca**: Selecciona o crea: Año ➔ Facultad ➔ Escuela ➔ Promoción/Ciclo ➔ Curso ➔ Nueva Evaluación.
-3. **Carga de Criterios y Materiales**:
-   - Sube la Solución Oficial (con puntaje por pregunta).
-   - Sube Materiales de Apoyo (opcional).
-   - Ingresa las Indicaciones libres en el cuadro de texto.
-4. **Carga de Exámenes de Alumnos**: Arrastra el lote de fotos/escaneos de los alumnos.
-5. **Cálculo y Confirmación de Costo**: La calculadora muestra el costo estimado del lote; el docente confirma.
-6. **Procesamiento Asíncrono e Inteligente**:
-   - La IA analiza los exámenes confrontándolos con la solución, materiales e indicaciones.
-   - Fallback `"nada"` para nombres o respuestas ausentes.
-7. **Visualización y Exportación**:
-   - Visualización inmediata en tabla interactiva con notas, observaciones y detalle por pregunta.
-   - Botón para descargar reporte formal en **Excel (`.xlsx`)**.
+### Flujo A: Carga Docente Manual
+1. El docente sube la solución, materiales e indicaciones en la pestaña *"Carga docente"*.
+2. Confirma la rúbrica de preguntas y puntajes.
+3. Sube el lote de exámenes escaneados o fotografiados.
+4. Prepara la calificación y revisa el costo estimado oficial.
+5. Califica y revisa los resultados o descarga el acta en Excel.
+
+### Flujo B: Recepción Autónoma en el Aula
+1. El docente configura la evaluación con solución y rúbrica.
+2. Abre la pestaña *"Recepción de alumnos"*, fija el aforo de estudiantes presentes en el aula (ej. 30 alumnos) para evitar que personas ausentes suban exámenes, copia el enlace o mensaje de WhatsApp y lo comparte con los alumnos.
+3. Los alumnos ingresan desde su smartphone, digitan su código y suben su foto (pudiendo rotarla y verificar nitidez). Si el aforo ya fue completado, el sistema bloquea nuevos registros automáticamente.
+4. El docente observa en vivo cómo van llegando las entregas en su teléfono o laptop (`X / Y alumnos presentes`).
+5. Al cumplirse el plazo o cerrar las entregas, el docente selecciona *"Revisar solo pendientes"*, *"Revisar a todos"* o *"Revisar seleccionados"*.
+6. La IA califica los exámenes y el profesor audita cada examen con la foto del estudiante al lado de las justificaciones.

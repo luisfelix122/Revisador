@@ -29,9 +29,10 @@ Año Académico
         └── Escuela Profesional
               └── Promoción / Ciclo
                     └── Curso
-                          └── Evaluación (Solución, Materiales de Apoyo, Indicaciones, Puntuaciones)
-                                └── Examen de Estudiante (Fotos, Calificación, Justificación)
-                                      └── Detalle por Pregunta
+                          └── Evaluación (Solución, Materiales de Apoyo, Indicaciones, Puntuaciones, Recepción Autónoma)
+                                └── Examen de Estudiante (Fotos, Calificación, Justificación, Estado, Reenvío)
+                                      ├── Detalle por Pregunta (Puntaje Obtenido, Máximo, Justificación IA)
+                                      └── Historial de Entregas Inmutable (Versiones #1, #2, Auditoría Docente)
 ```
 
 ### Reglas de Normalización (Mínimo 3NF):
@@ -56,6 +57,33 @@ Año Académico
 
 ### 3.3. Materiales de Apoyo Complementarios
 - Posibilidad de subir archivos adicionales (PDF, Word, imágenes, apuntes) para que la IA los considere como bibliografía y contexto complementario al corregir.
+
+### 3.4. Módulo de Recepción Autónoma de Alumnos e Historial Inmutable
+- **Modalidad Dual por Pestañas**: Pestaña "Carga docente (manual)" y pestaña "Recepción de alumnos" en la cabecera de la evaluación, permitiendo alternar sin perder datos.
+- **Acceso Público para Estudiantes**: Enlace compartible y texto formateado para WhatsApp (`/?entrega=<token>`) donde los alumnos suben sus fotos o PDF desde su teléfono móvil sin necesidad de crear cuenta ni registrarse.
+- **Control Estricto de Duplicados en Base de Datos**: Restricción de unicidad relacional `(evaluacion_id, lower(trim(codigo_estudiante)))`. Un alumno no puede reenviar por su cuenta una vez entregado.
+- **Control de Permisos de Reenvío por el Docente**: El profesor tiene el control absoluto para habilitar reenvíos:
+  - *Individual*: Switch/botón por estudiante en la tabla.
+  - *Grupal*: Opción para habilitar reenvíos a toda la clase simultáneamente.
+- **Control de Aforo y Alumnos Presentes en Aula**:
+  - El docente define la cantidad esperada de estudiantes que rinden la prueba en el salón (`cantidad_estudiantes_esperados`) para prevenir que alumnos ausentes o fuera del aula suban exámenes con el enlace compartido.
+  - Bloqueo automático en base de datos al alcanzar el aforo configurado (`COUNT(*) >= cantidad_estudiantes_esperados`), emitiendo mensaje cordial de cupo completado.
+  - Los reenvíos autorizados de estudiantes ya registrados no consumen vacantes extras.
+  - Indicador visual en tiempo real en panel docente (`Entregas recibidas: X / Y alumnos en aula`) y advertencia para alumnos si el aforo fue completado.
+- **Historial Inmutable de Entregas (3NF)**: Tabla `historial_entregas_estudiantes`. Ningún reenvío borra ni sobrescribe entregas previas. Todas las versiones (`Entrega #1`, `Entrega #2`, etc.) quedan grabadas con timestamp para que el profesor audite qué cambió el estudiante.
+- **Control de Tiempo en el Aula**:
+  - Botón *"Cerrar entregas ahora"* y *"Reabrir entregas"* para atender incidencias en el salón sin borrar las entregas ya registradas.
+  - Temporizador programable con minutos de tolerancia y cuenta regresiva visible para alumnos y docente.
+- **Previsualización y Rotación Interactiva (90°)**:
+  - Estudiantes: Vista previa antes de confirmar con botón de giro 90° (0°, 90°, 180°, 270°) y comprobante digital con número de entrega y hora.
+  - Docente: Visor con rotación (0°, 90°, 180°, 270°), controles de zoom (1x a 3x) y selector de versiones para comparar entregas históricas del alumno.
+- **Modalidades de Calificación Flexibles**:
+  - *"Revisar solo pendientes"*: Califica únicamente exámenes que no han sido completados.
+  - *"Revisar a todos"*: Reinicia y recalifica la totalidad del lote.
+  - *"Revisar seleccionados"*: Procesa solo los alumnos marcados con casilla de verificación.
+  - Botón individual *"Revisar examen"*: Abre la ventana dividida con foto del examen y justificaciones detalladas por pregunta.
+- **Jerarquía Académica Visible**: Se mantiene visible en todo momento la ruta de navegación jerárquica (`Año` › `Facultad` › `Escuela` › `Ciclo` › `Curso`).
+- **Diseño sin Emojis**: Iconografía exclusivamente SVG mediante `lucide-react` respetando Material Design estilo Google Groups.
 
 ---
 

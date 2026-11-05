@@ -9,7 +9,13 @@ import {
   Upload as Subir,
   Download as Descargar,
   Check as Check,
+  Share2 as CompartirIcon,
+  RotateCw as GirarIcon,
+  ZoomIn as AcercarIcon,
+  ZoomOut as AlejarIcon,
+  History as HistorialIcon,
 } from "lucide-react";
+import { RecepcionAlumnos } from "./RecepcionAlumnos";
 import {
   ServicioBiblioteca,
   type EvaluacionDetalle,
@@ -23,6 +29,11 @@ import { Ventana } from "./Ventana";
 interface Preparacion {
   examenes: number;
   huella: string;
+  costo_usd?: string;
+  tarifa_entrada?: string;
+  tarifa_salida?: string;
+  fuente_tarifas?: string;
+  advertencia?: string;
 }
 interface Propiedades {
   identificador: string;
@@ -57,9 +68,10 @@ export function DetalleEvaluacion({
     [consentimientoAnalisis, consentirAnalisis] = usarEstado(false),
     [busqueda, buscar] = usarEstado(""),
     [filtro, filtrar] = usarEstado("todos"),
+    [pestanaActiva, cambiarPestanaActiva] = usarEstado<"recepcion" | "docente">("docente"),
     [revisando, revisar] = usarEstado<Examen | null>(null);
   const detener = usarReferencia(false);
-  const configuracionEstimada = usarReferencia<{proveedor: string; clave_api: string; modelo: string} | null>(null);
+  const configuracionEstimada = usarReferencia<{proveedor: string; clave_api: string; modelo: string; claves_adicionales?: string[]} | null>(null);
   const cargar = usarCallback(async () => {
     const datos = await servicio.evaluacion(identificador);
     cambiarEvaluacion({
@@ -109,10 +121,14 @@ export function DetalleEvaluacion({
       throw new Error(
         "Abre Configuración y comprueba la conexión de IA antes de continuar.",
       );
+    const adicionales = (credenciales.claves || []).filter(
+      (c) => c && c.trim() !== '' && c !== credenciales.clave,
+    );
     return {
       proveedor: credenciales.proveedor,
       clave_api: credenciales.clave,
       modelo: credenciales.modelo,
+      claves_adicionales: adicionales,
     };
   };
   const subir = async (tipo: string, archivos: FileList | null) => {
@@ -253,6 +269,115 @@ export function DetalleEvaluacion({
     );
     await cargar().catch(() => {});
   };
+  const alCalificarLote = async (
+    modo: "pendientes" | "todos" | "seleccionados",
+    seleccionados?: string[],
+  ) => {
+    if (!evaluacion) return;
+    if (!apiVerificada) {
+      mostrarError("Abre Configuración y comprueba la conexión de IA antes de calificar.");
+      return;
+    }
+    if (!evaluacion.soluciones_profesor.length) {
+      mostrarError("Adjunta la solución oficial en la pestaña 'Carga docente' antes de calificar.");
+      return;
+    }
+    if (!guardada || !rubrica.length) {
+      mostrarError("Confirma la rúbrica de corrección antes de calificar.");
+      return;
+    }
+
+    let examenesAProcesar: Examen[] = [];
+    if (modo === "pendientes") {
+      examenesAProcesar = evaluacion.examenes_estudiantes.filter(
+        (e) => e.estado_revision !== "completado",
+      );
+    } else if (modo === "todos") {
+      examenesAProcesar = [...evaluacion.examenes_estudiantes];
+    } else if (modo === "seleccionados") {
+      const setSeleccionados = new Set(seleccionados || []);
+      examenesAProcesar = evaluacion.examenes_estudiantes.filter((e) =>
+        setSeleccionados.has(e.id),
+      );
+    }
+
+    if (examenesAProcesar.length === 0) {
+      avisar("No hay exámenes para calificar con el criterio seleccionado.");
+      return;
+    }
+
+    let configuracion;
+    try {
+      configuracion = credenciales();
+    } catch (problema) {
+      mostrarError(mensaje(problema));
+      return;
+    }
+
+    ocupar(true);
+    mostrarError("");
+    avisar("");
+
+    try {
+      if (modo === "todos" || modo === "seleccionados") {
+        for (const examen of examenesAProcesar) {
+          if (examen.estado_revision === "completado") {
+            await servicio.reiniciarExamen(identificador, examen.id).catch(() => {});
+          }
+        }
+      }
+
+      const prep = await servicio.datos<Preparacion>(
+        `/evaluaciones/${identificador}/preparar`,
+        { method: "POST" },
+      );
+
+      const parametros = {
+        ...configuracion,
+        confirmar_costo: true,
+        huella: prep.huella,
+      };
+
+      let indice = 0;
+      const fallos: string[] = [];
+      detener.current = false;
+      correr(true);
+      avisar(`Iniciando calificación de ${examenesAProcesar.length} examen(es)...`);
+
+      const trabajador = async () => {
+        while (!detener.current && indice < examenesAProcesar.length) {
+          const examen = examenesAProcesar[indice++];
+          try {
+            await servicio.datos(
+              `/evaluaciones/${identificador}/calificar/${examen.id}`,
+              { method: "POST", body: JSON.stringify(parametros) },
+            );
+          } catch (problema) {
+            fallos.push(mensaje(problema));
+          }
+          await cargar().catch(() => {});
+        }
+      };
+
+      await Promise.all([trabajador(), trabajador()]);
+
+      correr(false);
+      if (fallos.length) {
+        mostrarError(`${fallos.length} examen(es) no completados. ${fallos[0]}`);
+      }
+      avisar(
+        detener.current
+          ? "Calificación detenida."
+          : "Calificación completada exitosamente.",
+      );
+      await cargar().catch(() => {});
+    } catch (problema) {
+      mostrarError(mensaje(problema));
+    } finally {
+      ocupar(false);
+      correr(false);
+    }
+  };
   const descargar = async () => {
     ocupar(true);
     mostrarError("");
@@ -312,6 +437,20 @@ export function DetalleEvaluacion({
           (filtro === "desaprobados" && e.nota_final < 10.5) ||
           (filtro === "nada" && e.nombre_estudiante === "nada")),
     );
+  const cursoObj = evaluacion.cursos;
+  const cicloObj = cursoObj?.promociones_ciclos;
+  const escuelaObj = cicloObj?.escuelas;
+  const facultadObj = escuelaObj?.facultades;
+  const anioObj = facultadObj?.anios_academicos;
+
+  const migasJerarquia = [
+    anioObj?.anio ? `Año ${anioObj.anio}` : null,
+    facultadObj?.nombre,
+    escuelaObj?.nombre,
+    cicloObj?.denominacion,
+    cursoObj?.nombre,
+  ].filter(Boolean);
+
   return (
     <section className="detalle">
       <button className="boton-texto" onClick={alVolver} disabled={corriendo}>
@@ -320,6 +459,11 @@ export function DetalleEvaluacion({
       </button>
       <div className="cabecera-detalle">
         <div>
+          {migasJerarquia.length > 0 && (
+            <div className="jerarquia-migas">
+              {migasJerarquia.join("  ›  ")}
+            </div>
+          )}
           <h1>{evaluacion.titulo}</h1>
           <p>
             {evaluacion.cursos.nombre} · Máximo{" "}
@@ -329,6 +473,27 @@ export function DetalleEvaluacion({
         <span className="estado-evaluacion">
           {evaluacion.estado === "borrador" ? "En preparación" : "Calificada"}
         </span>
+      </div>
+      <div className="pestanas-modalidad">
+        <button
+          type="button"
+          className={`pestana-boton ${pestanaActiva === "recepcion" ? "activa" : ""}`}
+          onClick={() => cambiarPestanaActiva("recepcion")}
+        >
+          <CompartirIcon size={16} />
+          Recepción de alumnos
+          <span className="badge-contador">
+            {evaluacion.examenes_estudiantes.length}
+          </span>
+        </button>
+        <button
+          type="button"
+          className={`pestana-boton ${pestanaActiva === "docente" ? "activa" : ""}`}
+          onClick={() => cambiarPestanaActiva("docente")}
+        >
+          <Subir size={16} />
+          Carga docente (manual)
+        </button>
       </div>
       {error && (
         <p className="error" role="alert">
@@ -340,7 +505,20 @@ export function DetalleEvaluacion({
           {aviso}
         </p>
       )}
-      <section className="seccion-evaluacion" aria-labelledby="titulo-archivos">
+      {pestanaActiva === "recepcion" ? (
+        <RecepcionAlumnos
+          evaluacion={evaluacion}
+          servicio={servicio}
+          apiVerificada={apiVerificada}
+          alActualizar={cargar}
+          alRevisarExamen={(examen) => revisar(examen)}
+          alCalificarLote={alCalificarLote}
+          ocupado={ocupado}
+          corriendo={corriendo}
+        />
+      ) : (
+        <>
+          <section className="seccion-evaluacion" aria-labelledby="titulo-archivos">
         <h2 id="titulo-archivos">Solución, materiales y exámenes</h2>
         <p className="descripcion">
           Hasta 3 MB por archivo y 20 páginas por documento. Cada imagen de
@@ -609,6 +787,16 @@ export function DetalleEvaluacion({
         {estimacion && (
           <div className="resultado-costo">
             <strong>{estimacion.examenes} {estimacion.examenes === 1 ? "examen pendiente" : "exámenes pendientes"}</strong>
+            {estimacion.costo_usd && (
+              <p style={{ margin: "6px 0", color: "#137333", fontWeight: 600 }}>
+                Costo estimado oficial: ~${Number(estimacion.costo_usd).toFixed(4)} USD
+                {estimacion.fuente_tarifas && (
+                  <span style={{ fontSize: "12px", color: "#5f6368", display: "block", fontWeight: "normal" }}>
+                    ({estimacion.fuente_tarifas})
+                  </span>
+                )}
+              </p>
+            )}
             <p>Se enviarán la solución, los materiales, las indicaciones y las fotos al proveedor seleccionado. La llamada puede consumir saldo.</p>
             <label className="casilla">
               <input type="checkbox" checked={consentimiento} onChange={(evento) => consentir(evento.target.checked)} />
@@ -653,6 +841,8 @@ export function DetalleEvaluacion({
             </p>
           )}
       </section>
+        </>
+      )}
       <section className="seccion-evaluacion">
         <div className="cabecera-detalle">
           <h2>Resultados y revisión docente</h2>
@@ -826,7 +1016,42 @@ function RevisionExamen({
       examen.detalles_preguntas,
     ),
     [ocupado, ocupar] = usarEstado(false),
-    [error, mostrarError] = usarEstado("");
+    [error, mostrarError] = usarEstado(""),
+    [rotacion, cambiarRotacion] = usarEstado(0),
+    [zoom, cambiarZoom] = usarEstado(1),
+    [rutaActiva, cambiarRutaActiva] = usarEstado(examen.ruta_imagen_examen || ""),
+    [imagenUrl, cambiarImagenUrl] = usarEstado<string | null>(null),
+    [cargandoImagen, cambiarCargandoImagen] = usarEstado(false);
+
+  const historial = examen.historial_entregas_estudiantes || [];
+
+  usarEfecto(() => {
+    let activo = true;
+    if (!rutaActiva) {
+      cambiarImagenUrl(null);
+      return;
+    }
+    cambiarCargandoImagen(true);
+    servicio
+      .obtenerArchivoExamenUrl(evaluacionId, examen.id, rutaActiva)
+      .then((url) => {
+        if (activo) cambiarImagenUrl(url);
+      })
+      .catch(() => {
+        if (activo) cambiarImagenUrl(null);
+      })
+      .finally(() => {
+        if (activo) cambiarCargandoImagen(false);
+      });
+    return () => {
+      activo = false;
+    };
+  }, [evaluacionId, examen.id, rutaActiva, servicio]);
+
+  const girar = () => cambiarRotacion((prev) => (prev + 90) % 360);
+  const acercar = () => cambiarZoom((z) => Math.min(z + 0.25, 3));
+  const alejar = () => cambiarZoom((z) => Math.max(z - 0.25, 0.75));
+
   const guardar = async (evento: React.FormEvent) => {
     evento.preventDefault();
     ocupar(true);
@@ -856,109 +1081,211 @@ function RevisionExamen({
       ocupar(false);
     }
   };
+
   return (
-    <Ventana titulo="Revisión por pregunta" cerrar={cerrar}>
-      <form className="contenido-ventana" onSubmit={guardar}>
-        <label>
-          Estudiante
-          <input
-            maxLength={255}
-            value={nombre}
-            onChange={(evento) => cambiarNombre(evento.target.value)}
-          />
-        </label>
-        <label>
-          Código
-          <input
-            maxLength={100}
-            value={codigo}
-            onChange={(evento) => cambiarCodigo(evento.target.value)}
-          />
-        </label>
-        {preguntas.map((pregunta, indice) => (
-          <fieldset key={pregunta.numero_pregunta}>
-            <legend>
-              Pregunta {pregunta.numero_pregunta} · máximo{" "}
-              {pregunta.puntaje_maximo}
-            </legend>
-            <label>
-              Respuesta detectada
-              <textarea
-                value={pregunta.respuesta_detectada}
-                maxLength={10000}
-                rows={3}
-                onChange={(evento) => {
-                  const respuesta = evento.target.value;
-                  cambiarPreguntas(preguntas.map((p, i) => i === indice ? {
-                    ...p,
-                    respuesta_detectada: respuesta,
-                    puntaje_obtenido: respuestaAusente(respuesta) ? 0 : p.puntaje_obtenido,
-                  } : p));
-                }}
-              />
-            </label>
-            <label>
-              Puntaje obtenido
-              <input
-                type="number"
-                min="0"
-                max={pregunta.puntaje_maximo}
-                step="0.01"
-                required
-                disabled={respuestaAusente(pregunta.respuesta_detectada)}
-                value={pregunta.puntaje_obtenido}
-                onChange={(evento) =>
-                  cambiarPreguntas(
-                    preguntas.map((p, i) =>
-                      i === indice
-                        ? {
-                            ...p,
-                            puntaje_obtenido: Number(evento.target.value),
-                          }
-                        : p,
-                    ),
-                  )
-                }
-              />
-            </label>
-            {respuestaAusente(pregunta.respuesta_detectada) && (
-              <p className="ayuda-campo">Las respuestas sin contestar reciben cero puntos.</p>
+    <Ventana titulo={`Revisión de examen · ${codigo || "Estudiante"}`} cerrar={cerrar}>
+      <div className="revision-contenedor-dividido">
+        {/* Columna Visor de Examen */}
+        <section className="visor-columna" aria-label="Visor de examen del estudiante">
+          <div className="visor-herramientas">
+            <span className="visor-etiqueta">
+              {examen.numero_entregas && examen.numero_entregas > 1
+                ? `Entrega activa #${examen.numero_entregas}`
+                : "Examen entregado"}
+            </span>
+            <div className="visor-botones">
+              <button
+                type="button"
+                className="boton-icono pequeno"
+                onClick={girar}
+                title="Girar 90°"
+                aria-label="Girar 90°"
+              >
+                <GirarIcon size={16} />
+              </button>
+              <button
+                type="button"
+                className="boton-icono pequeno"
+                onClick={alejar}
+                title="Alejar"
+                aria-label="Alejar"
+                disabled={zoom <= 0.75}
+              >
+                <AlejarIcon size={16} />
+              </button>
+              <span className="zoom-indicador">{Math.round(zoom * 100)}%</span>
+              <button
+                type="button"
+                className="boton-icono pequeno"
+                onClick={acercar}
+                title="Acercar"
+                aria-label="Acercar"
+                disabled={zoom >= 3}
+              >
+                <AcercarIcon size={16} />
+              </button>
+            </div>
+          </div>
+
+          {historial.length > 1 && (
+            <div className="selector-versiones">
+              <label htmlFor="version-entrega">
+                <HistorialIcon size={14} />
+                Historial de entregas:
+              </label>
+              <select
+                id="version-entrega"
+                value={rutaActiva}
+                onChange={(e) => cambiarRutaActiva(e.target.value)}
+              >
+                {historial.map((h) => (
+                  <option key={h.id} value={h.ruta_archivo}>
+                    Entrega #{h.numero_entrega} — {new Date(h.creado_en).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}
+                    {h.ruta_archivo === examen.ruta_imagen_examen ? " (Actual)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="visor-lienzo">
+            {cargandoImagen ? (
+              <p className="visor-mensaje" role="status">Cargando archivo de examen…</p>
+            ) : imagenUrl ? (
+              <div className="visor-marco-imagen">
+                <img
+                  src={imagenUrl}
+                  alt={`Examen de ${nombre}`}
+                  style={{
+                    transform: `rotate(${rotacion}deg) scale(${zoom})`,
+                    transformOrigin: "center center",
+                    transition: "transform 0.2s ease-out",
+                    maxWidth: "100%",
+                  }}
+                />
+              </div>
+            ) : (
+              <p className="visor-mensaje">
+                No hay vista previa disponible para este archivo.
+              </p>
             )}
+          </div>
+        </section>
+
+        {/* Columna Formulario de Revisión */}
+        <form className="formulario-revision-columna" onSubmit={guardar}>
+          <div className="campos-dobles">
             <label>
-              Justificación
-              <textarea
-                required
-                maxLength={10000}
-                rows={3}
-                value={pregunta.justificacion}
-                onChange={(evento) =>
-                  cambiarPreguntas(
-                    preguntas.map((p, i) =>
-                      i === indice
-                        ? { ...p, justificacion: evento.target.value }
-                        : p,
-                    ),
-                  )
-                }
+              Estudiante
+              <input
+                maxLength={255}
+                value={nombre}
+                onChange={(evento) => cambiarNombre(evento.target.value)}
               />
             </label>
-          </fieldset>
-        ))}
-        <p>
-          Total:{" "}
-          {preguntas
-            .reduce((suma, p) => suma + Number(p.puntaje_obtenido), 0)
-            .toFixed(2)}
-        </p>
-        {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
-        )}
-        <button className="boton-primario" disabled={ocupado}>
-          {ocupado ? "Guardando…" : "Guardar revisión docente"}
-        </button>
-      </form>
+            <label>
+              Código
+              <input
+                maxLength={100}
+                value={codigo}
+                onChange={(evento) => cambiarCodigo(evento.target.value)}
+              />
+            </label>
+          </div>
+          <div className="lista-preguntas-revision">
+            {preguntas.map((pregunta, indice) => (
+              <fieldset key={pregunta.numero_pregunta}>
+                <legend>
+                  Pregunta {pregunta.numero_pregunta} · máximo {pregunta.puntaje_maximo}
+                </legend>
+                <label>
+                  Respuesta detectada
+                  <textarea
+                    value={pregunta.respuesta_detectada}
+                    maxLength={10000}
+                    rows={2}
+                    onChange={(evento) => {
+                      const respuesta = evento.target.value;
+                      cambiarPreguntas(
+                        preguntas.map((p, i) =>
+                          i === indice
+                            ? {
+                                ...p,
+                                respuesta_detectada: respuesta,
+                                puntaje_obtenido: respuestaAusente(respuesta) ? 0 : p.puntaje_obtenido,
+                              }
+                            : p
+                        )
+                      );
+                    }}
+                  />
+                </label>
+                <label>
+                  Puntaje obtenido
+                  <input
+                    type="number"
+                    min="0"
+                    max={pregunta.puntaje_maximo}
+                    step="0.01"
+                    required
+                    disabled={respuestaAusente(pregunta.respuesta_detectada)}
+                    value={pregunta.puntaje_obtenido}
+                    onChange={(evento) =>
+                      cambiarPreguntas(
+                        preguntas.map((p, i) =>
+                          i === indice
+                            ? {
+                                ...p,
+                                puntaje_obtenido: Number(evento.target.value),
+                              }
+                            : p
+                        )
+                      )
+                    }
+                  />
+                </label>
+                {respuestaAusente(pregunta.respuesta_detectada) && (
+                  <p className="ayuda-campo">Las respuestas sin contestar reciben cero puntos.</p>
+                )}
+                <label>
+                  Justificación de la IA
+                  <textarea
+                    required
+                    maxLength={10000}
+                    rows={3}
+                    value={pregunta.justificacion}
+                    onChange={(evento) =>
+                      cambiarPreguntas(
+                        preguntas.map((p, i) =>
+                          i === indice
+                            ? { ...p, justificacion: evento.target.value }
+                            : p
+                        )
+                      )
+                    }
+                  />
+                </label>
+              </fieldset>
+            ))}
+          </div>
+          <div className="pie-formulario-revision">
+            <p>
+              Total:{" "}
+              {preguntas
+                .reduce((suma, p) => suma + Number(p.puntaje_obtenido), 0)
+                .toFixed(2)}
+            </p>
+            {error && (
+              <p role="alert" className="error">
+                {error}
+              </p>
+            )}
+            <button className="boton-primario" disabled={ocupado}>
+              {ocupado ? "Guardando…" : "Guardar revisión docente"}
+            </button>
+          </div>
+        </form>
+      </div>
     </Ventana>
   );
 }

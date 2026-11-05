@@ -57,6 +57,53 @@ export class ServicioBiblioteca {
       body: formulario,
     });
   }
+  configurarRecepcion(
+    evaluacionId: string,
+    abierta: boolean,
+    tiempoMinutos: number | null = null,
+    permitirGlobal = false,
+    estudiantesEsperados: number | null = null,
+  ) {
+    return this.datos(`/evaluaciones/${evaluacionId}/recepcion/estado`, {
+      method: "PUT",
+      body: JSON.stringify({
+        abierta,
+        tiempo_minutos: tiempoMinutos,
+        permitir_reenvios_global: permitirGlobal,
+        estudiantes_esperados: estudiantesEsperados,
+      }),
+    });
+  }
+  permitirReenvioAlumno(evaluacionId: string, examenId: string, permitir: boolean) {
+    return this.datos(`/evaluaciones/${evaluacionId}/examenes/${examenId}/permitir-reenvio`, {
+      method: "PUT",
+      body: JSON.stringify({ permitir }),
+    });
+  }
+  historialAlumno(evaluacionId: string, examenId: string) {
+    return this.datos<{ examen_id: string; historial: HistorialEntrega[] }>(
+      `/evaluaciones/${evaluacionId}/examenes/${examenId}/historial`
+    );
+  }
+  reiniciarExamen(evaluacionId: string, examenId: string) {
+    return this.datos(`/evaluaciones/${evaluacionId}/examenes/${examenId}/reiniciar`, {
+      method: "POST",
+    });
+  }
+  async obtenerArchivoExamenUrl(evaluacionId: string, examenId: string, ruta?: string): Promise<string> {
+    const sufijo = ruta ? `?ruta=${encodeURIComponent(ruta)}` : "";
+    const respuesta = await this.solicitar(`/evaluaciones/${evaluacionId}/examenes/${examenId}/archivo${sufijo}`);
+    const blob = await respuesta.blob();
+    return URL.createObjectURL(blob);
+  }
+}
+
+export interface HistorialEntrega {
+  id: string;
+  numero_entrega: number;
+  ruta_archivo: string;
+  creado_en: string;
+  motivo_reenvio?: string;
 }
 
 export interface Pregunta {
@@ -79,7 +126,11 @@ export interface Examen {
   observaciones_generales: string;
   estado_revision: string;
   revisado_por_profesor: boolean;
+  ruta_imagen_examen?: string;
+  numero_entregas?: number;
+  permitir_reenvio?: boolean;
   detalles_preguntas: PreguntaResultado[];
+  historial_entregas_estudiantes?: HistorialEntrega[];
 }
 export interface Archivo {
   id: string;
@@ -93,6 +144,12 @@ export interface EvaluacionDetalle {
   indicaciones_profesor: string;
   puntaje_total_maximo: number;
   estado: string;
+  token_recepcion?: string;
+  recepcion_abierta?: boolean;
+  tiempo_limite_minutos?: number | null;
+  fecha_cierre_programada?: string | null;
+  permitir_reenvios_global?: boolean;
+  cantidad_estudiantes_esperados?: number | null;
   criterios_preguntas: Pregunta[];
   soluciones_profesor: Archivo[];
   materiales_apoyo: Archivo[];
@@ -110,6 +167,22 @@ export interface Curso {
   id: string;
   nombre: string;
   evaluaciones: EvaluacionLista[];
+  promociones_ciclos?: {
+    id: string;
+    denominacion: string;
+    escuelas?: {
+      id: string;
+      nombre: string;
+      facultades?: {
+        id: string;
+        nombre: string;
+        anios_academicos?: {
+          id: string;
+          anio: number;
+        };
+      };
+    };
+  };
 }
 export interface Ciclo {
   id: string;

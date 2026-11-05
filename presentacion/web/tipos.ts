@@ -15,5 +15,6 @@ export interface EvaluacionResumen {
 export interface Credenciales {
   proveedor: "openai" | "gemini";
   clave: string;
+  claves?: string[];
   modelo: string;
 }

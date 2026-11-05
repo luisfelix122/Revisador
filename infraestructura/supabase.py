@@ -46,8 +46,54 @@ class RepositorioSupabase:
     async def rpc(self, funcion: str, datos: dict):
         return await self.solicitar('POST', '/rest/v1/rpc/' + funcion, datos=datos)
 
+    @classmethod
+    async def solicitar_publico(cls, metodo: str, ruta: str, *, datos=None, contenido=None, cabeceras=None):
+        encabezados = {'apikey': CLAVE_PUBLICABLE, 'Prefer': 'return=representation', **(cabeceras or {})}
+        try:
+            async with httpx.AsyncClient(timeout=35, follow_redirects=False) as cliente:
+                respuesta = await cliente.request(metodo, URL_SUPABASE + ruta, headers=encabezados, json=datos, content=contenido)
+        except httpx.HTTPError:
+            raise ErrorPersistencia('No se pudo conectar con el portal de entregas. Inténtalo otra vez.') from None
+        if respuesta.status_code >= 400:
+            mensaje_servidor = None
+            try:
+                cuerpo_error = respuesta.json()
+                mensaje_servidor = cuerpo_error.get('message') or cuerpo_error.get('details')
+            except Exception:
+                pass
+            if mensaje_servidor:
+                raise ErrorPersistencia(mensaje_servidor, 423 if respuesta.status_code == 423 else (409 if respuesta.status_code == 409 else 422))
+            if respuesta.status_code == 404:
+                raise ErrorPersistencia('Evaluación no encontrada o enlace de entrega inválido.', 404)
+            if respuesta.status_code == 409:
+                raise ErrorPersistencia('Ya has entregado este examen. Solicita autorización a tu docente para reenviar.', 409)
+            if respuesta.status_code in (422, 423):
+                raise ErrorPersistencia('La recepción de entregas está cerrada o el archivo no es válido.', 422)
+            raise ErrorPersistencia('El servicio de entregas no está disponible.', 503)
+        return respuesta.json() if respuesta.content else None
+
+    @classmethod
+    async def rpc_publico(cls, funcion: str, datos: dict):
+        return await cls.solicitar_publico('POST', '/rest/v1/rpc/' + funcion, datos=datos)
+
+    @classmethod
+    async def subir_archivo_publico(cls, ruta: str, contenido: bytes, tipo_mime: str = 'image/jpeg'):
+        encabezados = {'apikey': CLAVE_PUBLICABLE, 'Content-Type': tipo_mime, 'x-upsert': 'true'}
+        try:
+            async with httpx.AsyncClient(timeout=35, follow_redirects=False) as cliente:
+                respuesta = await cliente.post(
+                    f'{URL_SUPABASE}/storage/v1/object/evaluaciones/{ruta}',
+                    headers=encabezados,
+                    content=contenido
+                )
+        except httpx.HTTPError:
+            raise ErrorPersistencia('No se pudo subir el archivo de examen. Inténtalo otra vez.') from None
+        if respuesta.status_code >= 400:
+            raise ErrorPersistencia('No se pudo almacenar el archivo de examen.', 422)
+        return ruta
+
     async def evaluacion(self, identificador: UUID) -> dict:
-        filas = await self.solicitar('GET', f'/rest/v1/evaluaciones?id=eq.{identificador}&select=*,cursos(*,promociones_ciclos(*,escuelas(*,facultades(*,anios_academicos(*))))),soluciones_profesor(*),materiales_apoyo(*),criterios_preguntas(*),examenes_estudiantes(*,detalles_preguntas(*))')
+        filas = await self.solicitar('GET', f'/rest/v1/evaluaciones?id=eq.{identificador}&select=*,cursos(*,promociones_ciclos(*,escuelas(*,facultades(*,anios_academicos(*))))),soluciones_profesor(*),materiales_apoyo(*),criterios_preguntas(*),examenes_estudiantes(*,detalles_preguntas(*),historial_entregas_estudiantes(*))')
         if not filas:
             raise ErrorPersistencia('Evaluación no encontrada en tu biblioteca.', 404)
         evaluacion = filas[0]
@@ -57,4 +103,8 @@ class RepositorioSupabase:
             evaluacion[relacion] = evaluacion.get(relacion) or []
         for examen in evaluacion['examenes_estudiantes']:
             examen['detalles_preguntas'] = examen.get('detalles_preguntas') or []
+            examen['historial_entregas_estudiantes'] = sorted(
+                examen.get('historial_entregas_estudiantes') or [],
+                key=lambda h: h.get('numero_entrega', 1)
+            )
         return evaluacion

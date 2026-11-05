@@ -28,8 +28,13 @@ El sistema no impone un modelo fijo. El selector se adapta dinámicamente según
   3. El frontend emite una petición liviana al backend (`POST /api/configuracion/comprobar-api`).
   4. El backend realiza una llamada ping/eco de prueba (1 token de saludo) a la API oficial.
   5. **Respuesta Visual**:
-     - **Éxito**: El botón muestra una animación de éxito y se enciende un **badge/check verde permanente** (`✔ Conexión verificada`).
+     - **Éxito**: El botón muestra una animación de éxito y se enciende un **badge/check verde permanente** (icono SVG Check verde con texto `Conexión verificada`).
      - **Fallo**: Se muestra un badge rojo con la razón exacta (ej. *Clave inválida*, *Cuota agotada*, *Error de red*).
+
+### 2.4. Gestión y Comprobación en Lote de Múltiples Claves API
+* **Múltiples Claves de Respaldo**: El docente puede registrar claves primarias y secundarias.
+* **Comprobación Masiva**: Botón para validar todas las claves en paralelo (`POST /api/configuracion/comprobar-lote`).
+* **Rotación y Tolerancia a Fallos**: Si una clave agota su cuota de solicitudes (código 429), el motor de calificación rota automáticamente a la siguiente clave disponible sin interrumpir la revisión del lote.
 
 ---
 
@@ -42,17 +47,21 @@ Otorgar previsibilidad económica absoluta al docente antes de enviar a califica
 1. **Cantidad de exámenes de alumnos** (número de imágenes subidas).
 2. **Volumen de la solución oficial** (número de páginas o imágenes).
 3. **Volumen de materiales de apoyo complementarios** (PDFs/Word/imágenes adjuntas).
-4. **Tarifario vigente del modelo seleccionado** (costo por millón de tokens de entrada/visión y costo por millón de tokens de salida).
+4. **Tarifario oficial del modelo seleccionado** (costo por millón de tokens de entrada/visión y costo por millón de tokens de salida).
 
-### 3.3. Fórmula de Estimación
+### 3.3. Consulta Dinámica de Tarifas Oficiales
+* Las tarifas no son fijas ni cableadas en el código (*hardcoded*).
+* Endpoint `/api/configuracion/tarifas-oficiales` consulta los precios actualizados de proveedores para reflejar variaciones de mercado en tiempo real.
+
+### 3.4. Fórmula de Estimación
 $$\text{Tokens Entrada Estimados} = (\text{Tokens Solución} + \text{Tokens Materiales} + \text{Tokens Indicaciones} + \text{Tokens Imagen Examen}) \times N_{\text{alumnos}}$$
 $$\text{Tokens Salida Estimados} = (\text{Tokens Promedio Retroalimentación por Alumno}) \times N_{\text{alumnos}}$$
 $$\text{Costo Total Estimado (USD)} = (\text{Tokens Entrada} \times \text{Tarifa Entrada}) + (\text{Tokens Salida} \times \text{Tarifa Salida})$$
 
-### 3.4. Interfaz Visual de la Calculadora
+### 3.5. Interfaz Visual de la Calculadora
 Aparece como un panel de confirmación justo antes de presionar el botón "Comenzar Calificación":
-* 📄 **Exámenes a procesar**: *35 alumnos*
-* 📚 **Materiales y Solución**: *3 páginas en total*
-* 🤖 **Modelo seleccionado**: *Gemini 2.0 Flash*
-* 💰 **Costo aproximado**: *~$0.02 USD (Prácticamente gratuito en capa estándar)*
+* **Exámenes a procesar**: *35 alumnos*
+* **Materiales y Solución**: *3 páginas en total*
+* **Modelo seleccionado**: *Gemini 2.5 Flash*
+* **Costo aproximado**: *~$0.02 USD (Prácticamente gratuito en capa estándar)*
 * Botón: `[ Confirmar y Calificar Lote ]`

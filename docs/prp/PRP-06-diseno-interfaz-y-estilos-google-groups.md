@@ -24,7 +24,7 @@ Construcción de la interfaz web completa utilizando los principios de **Materia
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [☰]  Revisador                         [ 🔍 Buscar... ]              [✔ API Conectada] [⚙]│ (Top Bar)
+│ [Menu] Revisador                       [ Buscar... ]                  [API Conectada]  │ (Top Bar)
 ├──────────────────────┬─────────────────────────────────────────────────────────────────┤
 │                      │                                                                 │
 │ Panel de Navegación  │  CONTENIDO PRINCIPAL (Fondo #ffffff, padding generoso)         │
@@ -33,11 +33,11 @@ Construcción de la interfaz web completa utilizando los principios de **Materia
 │ Fondo #f1f3f4        │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
 │ Sin bordes duros     │  │ Examen P-1   │  │ Práctica 2   │  │ Final Física │           │
 │                      │  │ 35 alumnos   │  │ 28 alumnos   │  │ 40 alumnos   │           │
-│ 📁 2026              │  └──────────────┘  └──────────────┘  └──────────────┘           │
-│   ▼ Fac. Ingeniería  │                                                                 │
-│     ▼ Esc. Sistemas  │  ─────────────────────────────────────────────────────────────  │
-│       ▼ Ciclo 2026-I │  [ Estado Vacío (Empty State) ]:                                │
-│         📘 Algoritmos│                     [ 📁 ] (Icono gris grande)                  │
+│ 2026                 │  └──────────────┘  └──────────────┘  └──────────────┘           │
+│   > Fac. Ingeniería  │                                                                 │
+│     > Esc. Sistemas  │  ─────────────────────────────────────────────────────────────  │
+│       > Ciclo 2026-I │  [ Estado Vacío (Empty State) ]:                                │
+│         Curso        │                     [ Icono Folder ] (Gris grande)              │
 │                      │   "Todavía no hay archivos. Todo está vacío y sin tareas        │
 │ [props: onClick...]  │    pendientes."                                                 │
 └──────────────────────┴─────────────────────────────────────────────────────────────────┘
@@ -47,11 +47,11 @@ Construcción de la interfaz web completa utilizando los principios de **Materia
 ### 2.1. Barra de Navegación Superior (Top App Bar)
 * **Apariencia**: Limpia, con fondo blanco puro (`#ffffff`) y borde inferior muy sutil (`1px solid #e0e0e0`). Altura estándar (56px a 64px).
 * **Extremo Superior Izquierdo**:
-  1. **Botón Icono Hamburguesa**: Botón con las 3 rayas horizontales (`menu` icon de Lucide/Material) para controlar la visibilidad y colapso del panel lateral.
+  1. **Botón Icono Hamburguesa**: Botón con las 3 rayas horizontales (`Menu` de `lucide-react`) para controlar la visibilidad y colapso del panel lateral.
   2. **Título del Sitio Web**: Ubicado inmediatamente a la derecha del menú hamburguesa, debe mostrarse el texto **"Revisador"** con tamaño de encabezado (`text-xl` o `text-lg`), peso semibold (`font-semibold`) y color gris oscuro (`#202124`).
 * **Extremo Superior Derecho**:
-  - Badge visual de estado de API (`✔ Conectada` con check verde `#1e8e3e` o `#5f6368` si no está configurada).
-  - Botón icono de ajustes (`settings` / engranaje) para abrir el modal de configuración de API y calculadora de costos.
+  - Badge visual de estado de API (icono SVG `Check` verde `#137333` o gris `#5f6368` si no está configurada).
+  - Botón icono de ajustes (`Settings` de `lucide-react`) para abrir el modal de configuración de API y calculadora de costos.
 
 ### 2.2. Panel Lateral Izquierdo (Sidebar / Explorador)
 * **Diseño Visual**:
@@ -93,3 +93,20 @@ Construcción de la interfaz web completa utilizando los principios de **Materia
   - Hover tenue (`#f8f9fa`).
   - Fallback `"nada"` destacado con un chip neutro (`bg-[#f1f3f4] text-[#5f6368]`).
   - Botón para descargar Excel (`.xlsx`) alineado al estilo de Google Sheets.
+
+### 3.4. Modalidad Dual por Pestañas en la Evaluación
+* Cabecera de la evaluación con selector de pestañas estilo Google Material:
+  - **Carga docente (manual)**: Carga de solución, materiales complementarios, rúbrica de puntajes y exámenes escaneados.
+  - **Recepción de alumnos**: Monitoreo en vivo de entregas, enlace público compartible y botón directo para WhatsApp.
+* Panel docente de control de aula:
+  - Selector de tiempo y botones "Cerrar entregas ahora" / "Reabrir entregas".
+  - Control de aforo en aula (`X / Y alumnos presentes`) con advertencia visual de cupo completado.
+  - Conmutadores para autorizar reenvíos (individual y masivo para la sección).
+
+### 3.5. Portal Público de Entrega del Estudiante (Móvil)
+* Acceso limpio mediante enlace con token (`/?entrega=<token>`) sin exigir creación de cuenta ni contraseñas.
+* Muestra de la jerarquía académica institucional (`Año` · `Facultad` · `Escuela` · `Curso`).
+* Formulario móvil con selector de cámara (`capture="environment"`) o subida de archivo (PDF/imagen).
+* Previsualización interactiva con botón de rotación a 90° (0°, 90°, 180°, 270°).
+* Comprobante digital de entrega con número correlativo (`Entrega #1`) y fecha/hora exacta.
+* Advertencia cordial si el aforo físico programado para el aula fue completado.

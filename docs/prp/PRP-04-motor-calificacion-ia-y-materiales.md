@@ -46,6 +46,14 @@ El docente carga las fotos o escaneos de las hojas de examen. Para cada alumno s
 3. **Consolidación de Nota Final**:
    - La nota final es la suma exacta de los puntajes obtenidos en cada pregunta.
    - Se emite una observación general de síntesis del examen.
+4. **Seguridad y Acceso Autorizado a Imágenes**:
+   - Validación de rutas en `DocumentosPrivados` asegurando acceso legítimo a exámenes cargados manualmente por el docente (`{usuario_id}/...`) y entregas autónomas de estudiantes (`estudiantes/{evaluacion_id}/...`), con protección estricta contra *path traversal* (`..`).
+
+### 3.2. Modalidades Flexibles de Ejecución del Lote
+* **Revisar solo pendientes**: Califica exclusivamente los exámenes que se encuentran en estado `pendiente` (sin nota), optimizando tiempo y cuota de API.
+* **Revisar a todos**: Recalifica la totalidad del lote de exámenes, permitiendo actualizar evaluaciones ante cambios en la rúbrica.
+* **Revisar seleccionados**: Filtra y califica únicamente a los estudiantes marcados con casilla de verificación en el panel.
+* **Revisión individual y auditoría docente**: Permite inspeccionar el examen de un estudiante específico con visor de imagen, rotación interactiva y desglose detallado por pregunta.
 
 ---
 

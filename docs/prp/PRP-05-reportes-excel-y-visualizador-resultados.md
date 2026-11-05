@@ -60,6 +60,6 @@ El libro generado contendrá una hoja principal denominada `Acta_de_Notas`:
 ---
 
 ## 4. Descarga Inmediata
-* Botón destacado en la interfaz: `[ 📥 Descargar Reporte en Excel (.xlsx) ]`.
+* Botón destacado en la interfaz: `[ Descargar Reporte en Excel (.xlsx) ]` (con icono SVG `Download` de `lucide-react`).
 * El archivo se genera en milisegundos mediante un flujo binario directo (`StreamingResponse`) con el nombre normalizado:
   `Acta_[Curso]_[Evaluacion]_[Fecha].xlsx`

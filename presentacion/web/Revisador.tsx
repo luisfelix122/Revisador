@@ -14,6 +14,7 @@ import { Acceso } from "./componentes/Acceso";
 import { OrganizarBiblioteca } from "./componentes/OrganizarBiblioteca";
 import { NuevaEvaluacion } from "./componentes/NuevaEvaluacion";
 import { DetalleEvaluacion } from "./componentes/DetalleEvaluacion";
+import { PortalEntregaAlumno } from "./componentes/PortalEntregaAlumno";
 import {
   ServicioBiblioteca,
   type Anio,
@@ -31,7 +32,18 @@ export function Revisador() {
     [creando, crear] = usarEstado(false),
     [evaluacion, abrirEvaluacion] = usarEstado<string | null>(null),
     [activo, cambiarActivo] = usarEstado<string | undefined>(),
-    [verificada, verificar] = usarEstado(false);
+    [verificada, verificar] = usarEstado(false),
+    [tokenEntrega, cambiarTokenEntrega] = usarEstado<string | null>(() => {
+      if (typeof window === "undefined") return null;
+      const params = new URLSearchParams(window.location.search);
+      const param = params.get("entrega");
+      if (param) return param;
+      if (window.location.pathname.startsWith("/entrega/")) {
+        const parte = window.location.pathname.replace("/entrega/", "").trim();
+        return parte || null;
+      }
+      return null;
+    });
   const servicio = usarMemo(
     () => (cliente ? new ServicioBiblioteca(cliente) : null),
     [cliente],
@@ -191,6 +203,21 @@ export function Revisador() {
     sessionStorage.removeItem("revisador.ia");
     verificar(false);
   };
+  if (tokenEntrega) {
+    return (
+      <PortalEntregaAlumno
+        token={tokenEntrega}
+        alVolver={() => {
+          cambiarTokenEntrega(null);
+          if (typeof window !== "undefined") {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("entrega");
+            window.history.pushState({}, "", url.pathname + (url.search ? url.search : ""));
+          }
+        }}
+      />
+    );
+  }
   if (cargando)
     return (
       <div className="carga-inicial" role="status">

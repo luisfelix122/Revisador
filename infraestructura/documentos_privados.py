@@ -9,7 +9,9 @@ class DocumentosPrivados:
         self.repositorio = repositorio
 
     async def leer(self, ruta: str):
-        if not ruta.startswith(str(self.repositorio.sesion.usuario_id)+'/') or '..' in ruta:
+        es_propio = ruta.startswith(str(self.repositorio.sesion.usuario_id)+'/')
+        es_estudiante = ruta.startswith('estudiantes/')
+        if not (es_propio or es_estudiante) or '..' in ruta:
             raise ValueError('La ruta del archivo no pertenece a tu sesión')
         contenido = await self.repositorio.solicitar('GET','/storage/v1/object/authenticated/evaluaciones/'+quote(ruta,safe='/'),binario=True)
         return await asyncio.to_thread(ExtraerDocumento().extraer,ruta,contenido)

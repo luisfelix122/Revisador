@@ -73,3 +73,33 @@ def test_error_openai_no_recomienda_modelos_de_google(monkeypatch):
     assert respuesta.status_code == 502
     assert 'Google' not in respuesta.text
     assert 'gemini' not in respuesta.text.lower()
+
+
+def test_debe_obtener_tarifas_oficiales_dinamicas():
+    respuesta = TestClient(aplicacion).get('/api/configuracion/tarifas-oficiales?proveedor=gemini&modelo=gemini-flash-lite-latest')
+    assert respuesta.status_code == 200
+    datos = respuesta.json()
+    assert datos['proveedor'] == 'gemini'
+    assert datos['modelo'] == 'gemini-flash-lite-latest'
+    assert float(datos['tarifa_entrada']) > 0
+    assert float(datos['tarifa_salida']) > 0
+    assert 'ai.google.dev' in datos['fuente']
+
+
+def test_debe_comprobar_lote_de_claves(monkeypatch):
+    from infraestructura.proveedores import ProveedorHTTP
+    async def mock_comprobar_lote(self, claves, modelo):
+        return [{"clave": c, "valida": True, "detalle": "OK"} for c in claves]
+    monkeypatch.setattr(ProveedorHTTP, "comprobar_lote", mock_comprobar_lote)
+
+    respuesta = TestClient(aplicacion).post('/api/configuracion/comprobar-lote', json={
+        'proveedor': 'gemini',
+        'claves_api': ['clave_1', 'clave_2'],
+        'modelo': 'gemini-flash-lite-latest'
+    })
+    assert respuesta.status_code == 200
+    datos = respuesta.json()
+    assert len(datos['resultados']) == 2
+    assert datos['resultados'][0]['valida'] is True
+    assert respuesta.headers['cache-control'] == 'no-store'
+

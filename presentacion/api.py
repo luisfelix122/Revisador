@@ -9,7 +9,9 @@ from aplicacion.configuracion import ValidarConexionApi
 from dominio.puertos import ErrorProveedor, IProveedorVisionIA
 from presentacion.dependencias import obtener_proveedor
 from aplicacion.costos import CalcularCostoEstimado, SolicitudCosto
-from presentacion.esquemas import ConfiguracionIA
+from presentacion.esquemas import ConfiguracionIA, PeticionComprobarLote
+from infraestructura.tarifas_ia import ServicioTarifasOficiales
+from infraestructura.proveedores import ProveedorHTTP
 from dominio.puertos import IGeneradorExcel
 from dominio.calificacion import DetallePregunta, ExamenEstudiante
 from aplicacion.reportes import GenerarReporteExcelNotas
@@ -18,11 +20,13 @@ from io import BytesIO
 from presentacion.biblioteca import enrutador as biblioteca
 from infraestructura.supabase import ErrorPersistencia, URL_SUPABASE, CLAVE_PUBLICABLE
 from presentacion.evaluaciones import enrutador as evaluaciones
+from presentacion.recepcion import enrutador as recepcion
 
 
 aplicacion = FastAPI(title="Revisador", version="0.1.0")
 aplicacion.include_router(biblioteca)
 aplicacion.include_router(evaluaciones)
+aplicacion.include_router(recepcion)
 
 
 @aplicacion.exception_handler(ValueError)
@@ -69,6 +73,24 @@ async def listar_modelos(configuracion: ConfiguracionIA, respuesta: Response, pr
     modelos = await proveedor.listar_modelos(configuracion.clave_api.get_secret_value())
     respuesta.headers["Cache-Control"] = "no-store"
     return {"modelos": modelos}
+
+
+@aplicacion.get("/api/configuracion/tarifas-oficiales")
+async def tarifas_oficiales(proveedor: str = "gemini", modelo: str = "gemini-flash-lite-latest", respuesta: Response = None):
+    servicio = ServicioTarifasOficiales()
+    resultado = await servicio.obtener_tarifa(proveedor, modelo)
+    if respuesta:
+        respuesta.headers["Cache-Control"] = "public, max-age=1800"
+    return resultado
+
+
+@aplicacion.post("/api/configuracion/comprobar-lote")
+async def comprobar_lote(peticion: PeticionComprobarLote, respuesta: Response):
+    proveedor = ProveedorHTTP(peticion.proveedor)
+    claves = [c.get_secret_value() for c in peticion.claves_api]
+    resultados = await proveedor.comprobar_lote(claves, peticion.modelo)
+    respuesta.headers["Cache-Control"] = "no-store"
+    return {"resultados": resultados}
 
 
 class PeticionCosto(BaseModel):

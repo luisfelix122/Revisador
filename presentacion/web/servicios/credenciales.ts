@@ -19,7 +19,18 @@ export function leerCredenciales(): {
       typeof guardadas.modelo !== "string"
     )
       return { credenciales: vacias, recordar: false };
-    return { credenciales: guardadas, recordar: Boolean(local) };
+    const claves = Array.isArray(guardadas.claves)
+      ? guardadas.claves.filter((c: unknown) => typeof c === "string")
+      : [guardadas.clave].filter(Boolean);
+    return {
+      credenciales: {
+        proveedor: guardadas.proveedor,
+        clave: guardadas.clave,
+        claves: claves.length ? claves : [guardadas.clave].filter(Boolean),
+        modelo: guardadas.modelo,
+      },
+      recordar: Boolean(local),
+    };
   } catch {
     return { credenciales: vacias, recordar: false };
   }

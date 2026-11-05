@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import httpx
 import json
@@ -164,6 +165,21 @@ class ProveedorHTTP:
                 raise ValueError('Respuesta vacía')
         except (KeyError, IndexError, TypeError, AttributeError, ValueError):
             raise ErrorProveedor('El modelo no devolvió una respuesta válida para comprobar la conexión.') from None
+
+    async def comprobar_lote(self, claves: list[str], modelo: str) -> list[dict]:
+        async def verificar_una(clave: str) -> dict:
+            clave_limpia = (clave or "").strip()
+            if not clave_limpia:
+                return {"clave": clave, "valida": False, "detalle": "Clave vacía."}
+            try:
+                await self.comprobar(clave_limpia, modelo)
+                return {"clave": clave_limpia, "valida": True, "detalle": "Conexión exitosa y activa."}
+            except ErrorProveedor as error:
+                return {"clave": clave_limpia, "valida": False, "detalle": str(error)}
+            except Exception:
+                return {"clave": clave_limpia, "valida": False, "detalle": "Error al conectar con el proveedor."}
+
+        return list(await asyncio.gather(*(verificar_una(c) for c in claves)))
 
     async def generar(self, clave: str, modelo: str, instrucciones: str, documentos: list, esquema: dict) -> dict:
         imagenes = [imagen for documento in documentos for imagen in documento.imagenes]

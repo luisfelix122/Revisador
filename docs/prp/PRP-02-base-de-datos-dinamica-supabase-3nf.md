@@ -110,6 +110,12 @@ CREATE TABLE evaluaciones (
     indicaciones_profesor TEXT, -- Directrices libres ingresadas por el docente
     puntaje_total_maximo NUMERIC(5, 2) NOT NULL DEFAULT 20.00,
     estado VARCHAR(50) NOT NULL DEFAULT 'borrador', -- 'borrador', 'calificado', 'publicado'
+    token_recepcion UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    recepcion_abierta BOOLEAN NOT NULL DEFAULT true,
+    tiempo_limite_minutos INT,
+    fecha_cierre_programada TIMESTAMP WITH TIME ZONE,
+    permitir_reenvios_global BOOLEAN NOT NULL DEFAULT false,
+    cantidad_estudiantes_esperados INT DEFAULT NULL CHECK (cantidad_estudiantes_esperados IS NULL OR cantidad_estudiantes_esperados > 0),
     creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     actualizado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -148,17 +154,36 @@ CREATE TABLE examenes_estudiantes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     evaluacion_id UUID NOT NULL REFERENCES evaluaciones(id) ON DELETE CASCADE,
     nombre_estudiante VARCHAR(255) NOT NULL DEFAULT 'nada',
-    codigo_estudiante VARCHAR(100) DEFAULT 'nada',
+    codigo_estudiante VARCHAR(100) NOT NULL DEFAULT 'nada',
     ruta_imagen_examen VARCHAR(500) NOT NULL,
+    numero_entregas INT NOT NULL DEFAULT 1,
+    permitir_reenvio BOOLEAN NOT NULL DEFAULT false,
     nota_final NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
     observaciones_generales TEXT,
-    estado_revision VARCHAR(50) NOT NULL DEFAULT 'completado',
+    estado_revision VARCHAR(50) NOT NULL DEFAULT 'pendiente',
     creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     actualizado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX idx_evaluacion_codigo_unico 
+ON examenes_estudiantes(evaluacion_id, lower(trim(codigo_estudiante)))
+WHERE codigo_estudiante <> 'nada';
+
 -- ============================================================================
--- 10. DETALLES POR PREGUNTA (Atómico en 3NF)
+-- 10. HISTORIAL INMUTABLE DE ENTREGAS (Auditoría 3NF)
+-- ============================================================================
+CREATE TABLE historial_entregas_estudiantes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    examen_estudiante_id UUID NOT NULL REFERENCES examenes_estudiantes(id) ON DELETE CASCADE,
+    numero_entrega INT NOT NULL,
+    ruta_archivo VARCHAR(500) NOT NULL,
+    motivo_reenvio TEXT,
+    creado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT uq_historial_examen_entrega UNIQUE (examen_estudiante_id, numero_entrega)
+);
+
+-- ============================================================================
+-- 11. DETALLES POR PREGUNTA (Atómico en 3NF)
 -- ============================================================================
 CREATE TABLE detalles_preguntas (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -195,3 +220,22 @@ Para renderizar la biblioteca en cascada (árbol de navegación dinámico), las 
 - `SELECT * FROM cursos WHERE promocion_ciclo_id = :id;`
 
 Esto garantiza tiempos de respuesta instantáneos y cero consumo innecesario de ancho de banda.
+
+---
+
+## 5. Control de Aforo de Aula y Funciones Almacenadas (RPC) en 3NF
+
+Para garantizar integridad relacional y concurrencia segura sin condiciones de carrera (*race conditions*) al recibir entregas masivas desde smartphones, se emplean funciones transaccionales en PostgreSQL:
+
+1. **`registrar_entrega_estudiante(p_token, p_codigo, p_nombre, p_ruta_archivo)`**:
+   - Valida el estado de recepción abierta y la vigencia temporal.
+   - **Control de Aforo (`cantidad_estudiantes_esperados`)**:
+     - Si el estudiante es nuevo y la cantidad de entregas actuales ya alcanzó el aforo (`COUNT(*) >= cantidad_estudiantes_esperados`), lanza excepción con código SQL `42301`, impidiendo que alumnos no presentes en el salón utilicen el enlace público.
+     - Si el estudiante ya tiene un examen registrado y cuenta con autorización docente (`permitir_reenvio = true` o `permitir_reenvios_global = true`), se permite la actualización sin consumir un cupo adicional.
+   - **Historial Inmutable (3NF)**: Inserta la nueva versión en `historial_entregas_estudiantes` con timestamp y número correlativo incrementado.
+
+2. **`configurar_recepcion_docente(p_evaluacion_id, p_abierta, p_minutos_limite, p_reenvios_global, p_estudiantes_esperados)`**:
+   - Permite al profesor abrir/cerrar entregas, definir tiempo límite, alternar reenvíos masivos y fijar/ampliar el aforo en tiempo real.
+
+3. **`obtener_info_recepcion(p_token)`**:
+   - Devuelve la jerarquía institucional (`Año` › `Facultad` › `Escuela` › `Curso`), el estado de recepción, el aforo configurado (`cantidad_estudiantes_esperados`), el total de entregas recibidas y el indicador booleano `cupo_alcanzado`.

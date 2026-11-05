@@ -1,13 +1,60 @@
-import { useState as usarEstado } from "react";
+import { useState as usarEstado, useEffect as usarEfecto } from "react";
+import { Coins as Monedas, RefreshCw as Recargar } from "lucide-react";
+import { consultarTarifasOficiales, type TarifasOficiales } from "../servicios/api";
+import { leerCredenciales } from "../servicios/credenciales";
+
+const MODELOS_COMUNES = [
+  { id: "gemini-flash-lite-latest", etiqueta: "Gemini Flash-Lite Latest (Recomendado y económico)" },
+  { id: "gemini-3.6-flash", etiqueta: "Gemini 3.6 Flash (Equilibrado)" },
+  { id: "gemini-3.5-flash-lite", etiqueta: "Gemini 3.5 Flash-Lite" },
+  { id: "gemini-3.8-flash", etiqueta: "Gemini 3.8 Flash (Alta inteligencia)" },
+  { id: "gemini-flash-latest", etiqueta: "Gemini Flash Latest" },
+];
+
+const TARIFAS_DEFECTO: Record<string, { entrada: string; salida: string }> = {
+  "gemini-flash-lite-latest": { entrada: "0.30", salida: "2.50" },
+  "gemini-3.5-flash-lite": { entrada: "0.30", salida: "2.50" },
+  "gemini-3.6-flash": { entrada: "0.75", salida: "3.75" },
+  "gemini-3.8-flash": { entrada: "0.75", salida: "3.75" },
+  "gemini-flash-latest": { entrada: "0.75", salida: "3.75" },
+};
 
 export function CalculadoraCostos() {
-  const [examenes, cambiarExamenes] = usarEstado("1");
+  const [configuracion] = usarEstado(() => leerCredenciales().credenciales);
+  const [modeloSeleccionado, cambiarModeloSeleccionado] = usarEstado(
+    configuracion.modelo || "gemini-flash-lite-latest",
+  );
+  const modeloActual = configuracion.modelo || "gemini-flash-lite-latest";
+  const tarifasIniciales = TARIFAS_DEFECTO[modeloActual] || { entrada: "0.30", salida: "2.50" };
+  const [examenes, cambiarExamenes] = usarEstado("20");
   const [contexto, cambiarContexto] = usarEstado("2000");
-  const [entrada, cambiarEntrada] = usarEstado("");
-  const [salida, cambiarSalida] = usarEstado("");
+  const [entrada, cambiarEntrada] = usarEstado(tarifasIniciales.entrada);
+  const [salida, cambiarSalida] = usarEstado(tarifasIniciales.salida);
+  const [tarifasInfo, cambiarTarifasInfo] = usarEstado<TarifasOficiales | null>(null);
   const [resultado, cambiarResultado] = usarEstado<string | null>(null);
   const [ocupada, ocupar] = usarEstado(false);
+  const [cargandoTarifas, cambiarCargandoTarifas] = usarEstado(false);
   const [error, mostrarError] = usarEstado("");
+
+  const cargarTarifas = async (modelo: string) => {
+    cambiarCargandoTarifas(true);
+    try {
+      const datos = await consultarTarifasOficiales(
+        configuracion.proveedor || "gemini",
+        modelo,
+      );
+      if (datos && datos.tarifa_entrada && datos.tarifa_salida) {
+        cambiarTarifasInfo(datos);
+        cambiarEntrada(datos.tarifa_entrada);
+        cambiarSalida(datos.tarifa_salida);
+      }
+    } catch {
+      // Si falla, se pueden ingresar manualmente
+    } finally {
+      cambiarCargandoTarifas(false);
+    }
+  };
+
   const calcular = async () => {
     ocupar(true);
     mostrarError("");
@@ -48,12 +95,71 @@ export function CalculadoraCostos() {
       ocupar(false);
     }
   };
+
   return (
     <section aria-label="Estimador de costos">
       <p className="descripcion">
-        Planifica tu lote antes de procesarlo. Introduce las tarifas del modelo
-        que elegiste.
+        Planifica tu presupuesto antes de calificar. Los precios se obtienen en
+        vivo directamente de la documentación oficial de Google Gemini.
       </p>
+
+      <label style={{ marginBottom: "12px", display: "block" }}>
+        Modelo para estimar
+        <select
+          value={modeloSeleccionado}
+          onChange={(e) => {
+            const nuevoModelo = e.target.value;
+            cambiarModeloSeleccionado(nuevoModelo);
+            if (TARIFAS_DEFECTO[nuevoModelo]) {
+              cambiarEntrada(TARIFAS_DEFECTO[nuevoModelo].entrada);
+              cambiarSalida(TARIFAS_DEFECTO[nuevoModelo].salida);
+            }
+            void cargarTarifas(nuevoModelo);
+            cambiarResultado(null);
+          }}
+        >
+          {MODELOS_COMUNES.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.etiqueta}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {tarifasInfo && (
+        <div
+          style={{
+            background: "#e8f0fe",
+            border: "1px solid #d2e3fc",
+            borderRadius: "6px",
+            padding: "8px 12px",
+            marginBottom: "14px",
+            fontSize: "0.85rem",
+            color: "#174ea6",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <Monedas size={16} />
+            <span>
+              Tarifas oficiales: <strong>${tarifasInfo.tarifa_entrada}</strong> entrada /{" "}
+              <strong>${tarifasInfo.tarifa_salida}</strong> salida por 1M tokens
+            </span>
+          </div>
+          <button
+            type="button"
+            className="boton-contorno"
+            style={{ padding: "2px 6px", fontSize: "0.75rem", background: "white" }}
+            onClick={() => void cargarTarifas(modeloSeleccionado)}
+            title="Refrescar tarifas en vivo"
+          >
+            <Recargar size={12} className={cargandoTarifas ? "girando" : ""} />
+          </button>
+        </div>
+      )}
+
       <div className="campos-dobles">
         <label>
           Exámenes a procesar
@@ -92,7 +198,7 @@ export function CalculadoraCostos() {
             type="number"
             step="any"
             min="0"
-            placeholder="Ej. 1.00"
+            placeholder="Ej. 0.30"
             value={entrada}
             onChange={(evento) => {
               cambiarEntrada(evento.target.value);
@@ -106,7 +212,7 @@ export function CalculadoraCostos() {
             type="number"
             step="any"
             min="0"
-            placeholder="Ej. 2.00"
+            placeholder="Ej. 2.50"
             value={salida}
             onChange={(evento) => {
               cambiarSalida(evento.target.value);
@@ -116,8 +222,7 @@ export function CalculadoraCostos() {
         </label>
       </div>
       <p className="ayuda-campo">
-        Tarifas manuales, no verificadas automáticamente. No es una cotización:
-        el costo real depende de las imágenes y de la respuesta del modelo.
+        Tarifas oficiales en vivo ({tarifasInfo?.fuente || "ai.google.dev/pricing"}). No es una cotización: el costo real depende de las imágenes y tokens del modelo.
       </p>
       {error && (
         <p className="error" role="alert">
@@ -126,9 +231,9 @@ export function CalculadoraCostos() {
       )}
       {resultado !== null && (
         <div className="resultado-costo" role="status">
-          <span>Costo aproximado del lote</span>
+          <span>Costo aproximado del lote ({examenes} exámenes)</span>
           <strong>${resultado} USD</strong>
-          <span>No se ha enviado ningún examen a la IA.</span>
+          <span>Calculado con tarifas oficiales de {modeloSeleccionado}.</span>
         </div>
       )}
       <button
