@@ -89,9 +89,13 @@ export function PortalEntregaAlumno({ token, alVolver }: Propiedades) {
     mostrarError("");
 
     if (arch.type.startsWith("image/")) {
-      const lector = new FileReader();
-      lector.onload = () => cambiarVistaPrevia(lector.result as string);
-      lector.readAsDataURL(arch);
+      if (typeof window !== "undefined" && window.URL && typeof window.URL.createObjectURL === "function") {
+        cambiarVistaPrevia(window.URL.createObjectURL(arch));
+      } else {
+        const lector = new FileReader();
+        lector.onload = () => cambiarVistaPrevia(lector.result as string);
+        lector.readAsDataURL(arch);
+      }
     } else {
       cambiarVistaPrevia(null); // Es PDF
     }
