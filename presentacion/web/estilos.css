@@ -1134,6 +1134,63 @@ input[type="checkbox"] {
 .detalle > .boton-texto {
   margin: 0 0 24px -12px;
 }
+.pasos-evaluacion {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+  background: #f1f3f4;
+  border-radius: 12px;
+}
+.paso-evaluacion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 13px 14px;
+  text-align: left;
+  color: #5f6368;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.paso-evaluacion:hover { background: #ffffff; }
+.paso-evaluacion.activo {
+  color: #185abc;
+  background: #ffffff;
+  border-color: #d2e3fc;
+  box-shadow: 0 2px 6px rgb(60 64 67 / 10%);
+}
+.paso-numero {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #dadce0;
+  font-weight: 600;
+}
+.paso-evaluacion.activo .paso-numero { background: #1a73e8; border-color: #1a73e8; color: #ffffff; }
+.paso-evaluacion strong, .paso-evaluacion small { display: block; }
+.paso-evaluacion strong { font-size: 13px; font-weight: 600; }
+.paso-evaluacion small { margin-top: 4px; color: #5f6368; font-size: 12px; }
+.navegacion-pasos { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 28px; }
+.navegacion-pasos span { color: #5f6368; font-size: 12px; }
+.resumen-preparacion { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 20px 0; overflow: hidden; border: 1px solid #e0e0e0; border-radius: 8px; background: #e0e0e0; }
+.resumen-preparacion div { padding: 16px; background: #f8f9fa; }
+.resumen-preparacion span, .resumen-preparacion strong { display: block; }
+.resumen-preparacion span { color: #5f6368; font-size: 12px; margin-bottom: 6px; }
+.resumen-preparacion strong { color: #202124; font-size: 14px; font-weight: 600; }
+@media (max-width: 640px) {
+  .pasos-evaluacion { gap: 2px; }
+  .paso-evaluacion { flex-direction: column; align-items: flex-start; gap: 6px; padding: 10px 7px; }
+  .paso-evaluacion strong { font-size: 12px; }
+  .paso-evaluacion small { display: none; }
+  .resumen-preparacion { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .cabecera-detalle {
   display: flex;
   align-items: center;

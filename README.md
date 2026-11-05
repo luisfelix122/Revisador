@@ -36,7 +36,7 @@ Las pruebas usan dobles únicamente en la frontera de proveedores externos; no c
 - Biblioteca vacía real; tarjetas/lista, búsqueda y filtros con evaluaciones recibidas mediante props. No se fabrican resultados.
 - Consulta dinámica de modelos OpenAI/Gemini y comprobación real del modelo. Una comprobación puede consumir saldo. Algunos modelos del catálogo pueden no admitir el endpoint de generación utilizado.
 - Clave en `sessionStorage`, `localStorage` solo con consentimiento. El check nunca se restaura desde almacenamiento y se invalida al editar.
-- Calculadora HTTP y UI: estimación con tarifas manuales. No es un tarifario oficial actualizado ni una garantía de facturación.
+- Resumen previo a la calificación: estimación para el modelo y los exámenes seleccionados cuando hay tarifas disponibles. No es una garantía de facturación.
 - Dominio con `Decimal`, respuesta ausente `nada`/cero y suma de nota derivada.
 - Exportación HTTP Excel con acta, desglose, fórmulas y protección contra fórmulas inyectadas mediante nombres.
 - Supabase remoto: diez tablas y políticas RLS, propietario en la raíz académica.
@@ -61,7 +61,7 @@ El asesor de seguridad no encontró incidencias. El asesor de rendimiento inform
 
 ## Vercel
 
-La cuenta ya está conectada y se creó el proyecto **revisador** (`prj_IohAhnVLeetG1nHHf52LPjrLdUIX`) con framework Vite y código fuente privado. Se prepararon `vercel.json` y `api/index.py` para Vite con función Python/FastAPI. **Todavía no se ha publicado ni verificado ese enrutamiento en Vercel.** La publicación queda detenida hasta habilitar Git y obtener el recibo de revisión requerido. Antes de publicar, verificar `/`, `/api/configuracion/modelos`, `/api/evaluaciones/calcular-costo` y `/api/reportes/excel`, además del aislamiento de datos. Los lotes grandes requerirán un trabajador duradero, no tareas en memoria dentro de una función.
+La cuenta está conectada y el proyecto **revisador** (`prj_IohAhnVLeetG1nHHf52LPjrLdUIX`) está publicado en Vercel. Los servicios de Vite y FastAPI se configuran en `vercel.json`. Los lotes grandes requerirán un trabajador duradero, no tareas en memoria dentro de una función.
 
 Referencias consultadas: [FastAPI en Vercel](https://vercel.com/docs/frameworks/backend/fastapi), [RLS de Supabase](https://supabase.com/docs/guides/database/postgres/row-level-security), [modelos Gemini](https://ai.google.dev/api/models), [Responses de OpenAI](https://developers.openai.com/api/docs/guides/text).
 

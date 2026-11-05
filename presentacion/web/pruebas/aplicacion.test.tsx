@@ -147,45 +147,12 @@ prueba(
   },
 );
 
-prueba(
-  "estima costo con tarifas indicadas sin prometer precios oficiales",
-  async () => {
-    const peticion = simular.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          costo_usd: "0.0084",
-          tokens_entrada: 7200,
-          tokens_salida: 600,
-        }),
-        { status: 200 },
-      ),
-    );
-    try {
-      representar(<Aplicacion />);
-      await usuario.click(
-        pantalla.getByRole("button", { name: "Abrir configuración" }),
-      );
-      await usuario.click(
-        pantalla.getByRole("tab", { name: "Calculadora de costos" }),
-      );
-      await usuario.type(
-        pantalla.getByLabelText("Tarifa de entrada (USD / millón)"),
-        "1",
-      );
-      await usuario.type(
-        pantalla.getByLabelText("Tarifa de salida (USD / millón)"),
-        "2",
-      );
-      await usuario.click(
-        pantalla.getByRole("button", { name: "Calcular estimación" }),
-      );
-      esperar(await pantalla.findByText("$0.0084 USD")).toBeInTheDocument();
-      esperar(pantalla.getByText(/No es una cotización/)).toBeInTheDocument();
-    } finally {
-      peticion.mockRestore();
-    }
-  },
-);
+prueba("la configuración no muestra la calculadora independiente", async () => {
+  representar(<Aplicacion />);
+  await usuario.click(pantalla.getByRole("button", { name: "Abrir configuración" }));
+  esperar(pantalla.getByLabelText("Clave de API")).toBeInTheDocument();
+  esperar(pantalla.queryByRole("tab", { name: "Calculadora de costos" })).not.toBeInTheDocument();
+});
 
 prueba(
   "el móvil permite buscar y cerrar el explorador con Escape",

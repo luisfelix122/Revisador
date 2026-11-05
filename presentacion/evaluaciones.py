@@ -81,6 +81,7 @@ class PeticionEstimacion(BaseModel):
 class ModeloPreparacion(BaseModel):
     proveedor: Literal['gemini', 'openai']
     modelo: str = Field(min_length=1, max_length=150)
+    examenes_ids: list[UUID] | None = Field(default=None, min_length=1, max_length=1000)
 
 
 @enrutador.post('/{identificador}/preparar')
@@ -93,9 +94,16 @@ async def preparar(identificador: UUID, repositorio: Repositorio, peticion: Mode
     examenes = evaluacion.get('examenes_estudiantes') or []
     if not examenes:
         raise HTTPException(422, 'No hay exámenes registrados para calificar')
-    cantidad = sum(examen['estado_revision'] != 'completado' for examen in examenes)
-    if not cantidad:
-        cantidad = len(examenes)
+    if peticion and peticion.examenes_ids is not None:
+        seleccion = {str(identificador) for identificador in peticion.examenes_ids}
+        disponibles = {str(examen['id']) for examen in examenes}
+        if not seleccion.issubset(disponibles):
+            raise HTTPException(422, 'Los exámenes seleccionados no pertenecen a esta evaluación.')
+        cantidad = len(seleccion)
+    else:
+        cantidad = sum(examen['estado_revision'] != 'completado' for examen in examenes)
+        if not cantidad:
+            cantidad = len(examenes)
     paginas = sum(archivo.get('cantidad_paginas', 1) for archivo in evaluacion.get('soluciones_profesor', []) + evaluacion.get('materiales_apoyo', []))
     costo_usd = None
     fuente_tarifas = None

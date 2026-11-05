@@ -28,6 +28,33 @@ def test_preparacion_usa_tarifa_del_modelo_seleccionado(monkeypatch):
         aplicacion.dependency_overrides.pop(obtener_repositorio, None)
 
 
+def test_preparacion_estima_solo_examenes_seleccionados(monkeypatch):
+    from uuid import uuid4
+    from unittest.mock import AsyncMock
+    from presentacion.seguridad import obtener_repositorio
+    from infraestructura.tarifas_ia import ServicioTarifasOficiales
+    identificador, primero, segundo = str(uuid4()), str(uuid4()), str(uuid4())
+    evaluacion = {'id': identificador, 'puntaje_total_maximo': 20, 'indicaciones_profesor': '',
+        'soluciones_profesor': [{'ruta_almacenamiento': 'solucion', 'cantidad_paginas': 1}],
+        'materiales_apoyo': [], 'criterios_preguntas': [{'numero_pregunta': 1}],
+        'examenes_estudiantes': [{'id': primero, 'estado_revision': 'completado', 'ruta_imagen_examen': 'a'}, {'id': segundo, 'estado_revision': 'pendiente', 'ruta_imagen_examen': 'b'}]}
+    repositorio = type('RepositorioPrueba', (), {'evaluacion': AsyncMock(return_value=evaluacion)})()
+    monkeypatch.setattr(ServicioTarifasOficiales, 'obtener_tarifa', AsyncMock(return_value={'tarifa_entrada':'1', 'tarifa_salida':'2', 'fuente':'prueba'}))
+    aplicacion.dependency_overrides[obtener_repositorio] = lambda: repositorio
+    try:
+        cliente = TestClient(aplicacion)
+        uno = cliente.post(f'/api/evaluaciones/{identificador}/preparar', json={'proveedor':'openai', 'modelo':'gpt-4o', 'examenes_ids':[primero]})
+        ambos = cliente.post(f'/api/evaluaciones/{identificador}/preparar', json={'proveedor':'openai', 'modelo':'gpt-4o', 'examenes_ids':[primero, segundo]})
+        ajeno = cliente.post(f'/api/evaluaciones/{identificador}/preparar', json={'proveedor':'openai', 'modelo':'gpt-4o', 'examenes_ids':[str(uuid4())]})
+        assert uno.status_code == ambos.status_code == 200
+        assert uno.json()['examenes'] == 1
+        assert ambos.json()['examenes'] == 2
+        assert float(ambos.json()['costo_usd']) == 2 * float(uno.json()['costo_usd'])
+        assert ajeno.status_code == 422
+    finally:
+        aplicacion.dependency_overrides.pop(obtener_repositorio, None)
+
+
 class ProveedorPrueba:
     async def comprobar(self, clave, modelo):
         return None

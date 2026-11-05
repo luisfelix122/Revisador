@@ -68,13 +68,19 @@ export function DetalleEvaluacion({
     [consentimientoAnalisis, consentirAnalisis] = usarEstado(false),
     [busqueda, buscar] = usarEstado(""),
     [filtro, filtrar] = usarEstado("todos"),
+    [paso, cambiarPaso] = usarEstado<1 | 2 | 3>(1),
     [pestanaActiva, cambiarPestanaActiva] = usarEstado<"recepcion" | "docente">("docente"),
     [revisando, revisar] = usarEstado<Examen | null>(null);
   const detener = usarReferencia(false);
+  const pasoInicializado = usarReferencia(false);
   const examenesPreparados = usarReferencia<Examen[] | null>(null);
   const configuracionEstimada = usarReferencia<{proveedor: string; clave_api: string; modelo: string; claves_adicionales?: string[]} | null>(null);
   const cargar = usarCallback(async () => {
     const datos = await servicio.evaluacion(identificador);
+    if (!pasoInicializado.current) {
+      pasoInicializado.current = true;
+      if ((datos.examenes_estudiantes || []).some((examen) => examen.estado_revision === "completado") || ((datos.soluciones_profesor || []).length && (datos.criterios_preguntas || []).length && (datos.examenes_estudiantes || []).length)) cambiarPaso(3);
+    }
     cambiarEvaluacion({
       ...datos,
       criterios_preguntas: datos.criterios_preguntas || [],
@@ -200,11 +206,11 @@ export function DetalleEvaluacion({
     try {
       const configuracion = credenciales();
       const resultado = await servicio.datos<Preparacion>(
-        `/evaluaciones/${identificador}/preparar`, { method: "POST", body: JSON.stringify({ proveedor: configuracion.proveedor, modelo: configuracion.modelo }) },
+        `/evaluaciones/${identificador}/preparar`, { method: "POST", body: JSON.stringify({ proveedor: configuracion.proveedor, modelo: configuracion.modelo, ...(examenes ? {examenes_ids: examenes.map((examen) => examen.id)} : {}) }) },
       );
       configuracionEstimada.current = configuracion;
       examenesPreparados.current = examenes ?? null;
-      cambiarEstimacion(examenes ? { ...resultado, examenes: examenes.length, costo_usd: undefined } : resultado);
+      cambiarEstimacion(resultado);
     } catch (problema) {
       mostrarError(mensaje(problema));
     } finally {
@@ -312,6 +318,7 @@ export function DetalleEvaluacion({
     }
 
     cambiarPestanaActiva("docente");
+    cambiarPaso(3);
     await preparar(examenesAProcesar);
   };
   const descargar = async () => {
@@ -454,7 +461,19 @@ export function DetalleEvaluacion({
         />
       ) : (
         <>
-          <section className="seccion-evaluacion" aria-labelledby="titulo-archivos">
+          <nav className="pasos-evaluacion" aria-label="Pasos para revisar la evaluación">
+            {([
+              {numero: 1, titulo: 'Archivos', detalle: 'Prepara el material'},
+              {numero: 2, titulo: 'Criterios', detalle: 'Define la rúbrica'},
+              {numero: 3, titulo: 'Revisión', detalle: 'Confirma y califica'},
+            ] as const).map((item) => (
+              <button key={item.numero} type="button" className={`paso-evaluacion ${paso === item.numero ? 'activo' : ''}`} aria-current={paso === item.numero ? 'step' : undefined} onClick={() => cambiarPaso(item.numero)}>
+                <span className="paso-numero">{item.numero}</span>
+                <span><strong>Paso {item.numero} · {item.titulo}</strong><small>{item.detalle}</small></span>
+              </button>
+            ))}
+          </nav>
+          <section className="seccion-evaluacion" aria-labelledby="titulo-archivos" hidden={paso !== 1}>
         <h2 id="titulo-archivos">Solución, materiales y exámenes</h2>
         <p className="descripcion">
           Hasta 3 MB por archivo y 20 páginas por documento. Cada imagen de
@@ -535,8 +554,9 @@ export function DetalleEvaluacion({
             <p className="indicaciones">{evaluacion.indicaciones_profesor}</p>
           </details>
         )}
+        <div className="navegacion-pasos"><span>Puedes volver a este paso en cualquier momento.</span><button type="button" className="boton-primario" onClick={() => cambiarPaso(2)}>Continuar a criterios</button></div>
       </section>
-      <section className="seccion-evaluacion">
+      <section className="seccion-evaluacion" hidden={paso !== 2}>
         <h2>Criterios de corrección</h2>
         <p className="descripcion">
           Extrae los criterios de la solución o escríbelos manualmente. Revisa
@@ -704,13 +724,19 @@ export function DetalleEvaluacion({
             </span>
           )}
         </div>
+        <div className="navegacion-pasos"><button type="button" className="boton-texto" onClick={() => cambiarPaso(1)}>Volver a archivos</button><button type="button" className="boton-primario" onClick={() => cambiarPaso(3)}>Continuar al resumen</button></div>
       </section>
-      <section className="seccion-evaluacion">
-        <h2>Calificación de exámenes</h2>
+      <section className="seccion-evaluacion" hidden={paso !== 3}>
+        <h2>Resumen de revisión</h2>
         <p className="descripcion">
-          Antes de continuar, comprueba tu API, adjunta la solución y los exámenes,
-          y guarda la rúbrica. La calificación envía documentos al proveedor y puede consumir saldo.
+          Comprueba el lote y el costo estimado antes de enviar los exámenes a tu proveedor de IA.
         </p>
+        <div className="resumen-preparacion">
+          <div><span>Solución</span><strong>{evaluacion.soluciones_profesor.length ? 'Lista' : 'Pendiente'}</strong></div>
+          <div><span>Rúbrica</span><strong>{guardada ? 'Guardada' : 'Pendiente'}</strong></div>
+          <div><span>Exámenes pendientes</span><strong>{evaluacion.examenes_estudiantes.length - completados.length}</strong></div>
+          <div><span>Conexión de IA</span><strong>{apiVerificada ? 'Verificada' : 'Pendiente'}</strong></div>
+        </div>
         <button
           className="boton-contorno"
           disabled={ocupado || corriendo || !guardada || !apiVerificada ||
@@ -722,7 +748,8 @@ export function DetalleEvaluacion({
         </button>
         {estimacion && (
           <div className="resultado-costo">
-            <strong>{estimacion.examenes} {estimacion.examenes === 1 ? "examen para revisar" : "exámenes para revisar"}</strong>
+            <strong>Resumen del lote · {estimacion.examenes} {estimacion.examenes === 1 ? "examen" : "exámenes"}</strong>
+            {configuracionEstimada.current && <p>Modelo: {configuracionEstimada.current.modelo}</p>}
             {estimacion.costo_usd && (
               <p style={{ margin: "6px 0", color: "#137333", fontWeight: 600 }}>
                 Costo estimado: ~${Number(estimacion.costo_usd).toFixed(4)} USD
@@ -734,7 +761,7 @@ export function DetalleEvaluacion({
               </p>
             )}
             {!estimacion.costo_usd && <p>No hay una estimación automática disponible para esta selección. Consulta las tarifas del proveedor antes de continuar.</p>}
-            <p>Se enviarán la solución, los materiales, las indicaciones y las fotos al proveedor seleccionado. La llamada puede consumir saldo.</p>
+            <p>Se enviarán la solución, los materiales, las indicaciones y los exámenes al proveedor seleccionado. El cálculo usa una cantidad estimada de tokens; el costo real puede variar según el contenido, las páginas y las tarifas vigentes.</p>
             <label className="casilla">
               <input type="checkbox" checked={consentimiento} onChange={(evento) => consentir(evento.target.checked)} />
               Autorizo el envío de estos documentos a mi proveedor y confirmo que puedo tratar los datos de mis estudiantes.
@@ -780,7 +807,7 @@ export function DetalleEvaluacion({
       </section>
         </>
       )}
-      <section className="seccion-evaluacion">
+      <section className="seccion-evaluacion" hidden={pestanaActiva === 'docente' && paso !== 3}>
         <div className="cabecera-detalle">
           <h2>Resultados y revisión docente</h2>
           <button

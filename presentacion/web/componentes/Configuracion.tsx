@@ -10,7 +10,6 @@ import {
   Plus as Mas,
   Trash2 as Eliminar,
   Layers as Lote,
-  Coins as Monedas,
 } from "lucide-react";
 import { Ventana } from "./Ventana";
 import {
@@ -21,11 +20,8 @@ import type { Credenciales } from "../tipos";
 import {
   solicitarConfiguracion,
   comprobarLoteClaves,
-  consultarTarifasOficiales,
-  type TarifasOficiales,
   type ResultadoComprobacionClave,
 } from "../servicios/api";
-import { CalculadoraCostos } from "./CalculadoraCostos";
 
 export function Configuracion({
   cerrar,
@@ -41,9 +37,6 @@ export function Configuracion({
   const [modelos, cambiarModelos] = usarEstado<string[]>([]);
   const [ocupado, ocupar] = usarEstado(false);
   const [exito, mostrarExito] = usarEstado(false);
-  const [pestana, cambiarPestana] = usarEstado<"conexion" | "costos">(
-    "conexion",
-  );
 
   // Estados para múltiples claves y resultados individuales
   const [clavesRespaldo, cambiarClavesRespaldo] = usarEstado<string[]>(
@@ -52,9 +45,6 @@ export function Configuracion({
   const [estadosClaves, cambiarEstadosClaves] = usarEstado<
     Record<string, { valida?: boolean; mensaje?: string; comprobando?: boolean }>
   >({});
-  const [tarifasOficiales, cambiarTarifasOficiales] = usarEstado<TarifasOficiales | null>(
-    null,
-  );
 
   const peticion = usarReferencia<AbortController | null>(null);
   usarEfecto(() => () => peticion.current?.abort(), []);
@@ -285,37 +275,8 @@ export function Configuracion({
 
   return (
     <Ventana titulo="Configuración de IA" cerrar={cerrar}>
-      <div className="pestanas" role="tablist" aria-label="Configuración">
-        <button
-          role="tab"
-          aria-selected={pestana === "conexion"}
-          aria-controls="panel-conexion"
-          id="tab-conexion"
-          onClick={() => cambiarPestana("conexion")}
-        >
-          Conexión de API
-        </button>
-        <button
-          role="tab"
-          aria-selected={pestana === "costos"}
-          aria-controls="panel-costos"
-          id="tab-costos"
-          onClick={() => cambiarPestana("costos")}
-        >
-          Calculadora de costos
-        </button>
-      </div>
       <div className="contenido-ventana">
-        {pestana === "costos" ? (
-          <div role="tabpanel" id="panel-costos" aria-labelledby="tab-costos">
-            <CalculadoraCostos />
-          </div>
-        ) : (
-          <div
-            role="tabpanel"
-            id="panel-conexion"
-            aria-labelledby="tab-conexion"
-          >
+          <div>
             <p className="descripcion">
               Elige tu proveedor y conecta tus claves de API. Puedes añadir
               claves de respaldo por si una agota su cuota.
@@ -496,45 +457,15 @@ export function Configuracion({
                     <option key={modelo} value={modelo}>
                       {modelo}{" "}
                       {esRecomendado
-                        ? "✨ (Recomendado y rápido con fotos)"
+                        ? "(Recomendado y rápido con fotos)"
                         : esAltaDemanda
-                          ? "⚡ (Último modelo - Alta demanda)"
+                          ? "(Último modelo - Alta demanda)"
                           : ""}
                     </option>
                   );
                 })}
               </select>
             </label>
-
-            {/* Tarjeta de Tarifas Oficiales en Vivo */}
-            {tarifasOficiales && (
-              <div
-                style={{
-                  background: "#f8f9fa",
-                  border: "1px solid #dadce0",
-                  borderRadius: "8px",
-                  padding: "10px 14px",
-                  margin: "12px 0",
-                  fontSize: "0.88rem",
-                  color: "#202124",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: 600, color: "#1a73e8", marginBottom: "4px" }}>
-                  <Monedas size={16} /> Tarifas Oficiales de Google Gemini ({tarifasOficiales.modelo})
-                </div>
-                <div style={{ display: "flex", gap: "16px", color: "#3c4043" }}>
-                  <span>
-                    <strong>Entrada:</strong> ${tarifasOficiales.tarifa_entrada} / 1M tokens
-                  </span>
-                  <span>
-                    <strong>Salida:</strong> ${tarifasOficiales.tarifa_salida} / 1M tokens
-                  </span>
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "#70757a", marginTop: "4px" }}>
-                  Fuente: {tarifasOficiales.fuente}
-                </div>
-              </div>
-            )}
 
             <p className="ayuda-campo">
               El proveedor determina qué modelos están disponibles. Si una clave
@@ -587,7 +518,6 @@ export function Configuracion({
               </button>
             </div>
           </div>
-        )}
       </div>
     </Ventana>
   );

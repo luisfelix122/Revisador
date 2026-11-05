@@ -9,6 +9,19 @@ import { ServicioBiblioteca } from "../servicios/biblioteca";
 import { DetalleEvaluacion } from "../componentes/DetalleEvaluacion";
 import { guardarCredenciales } from "../servicios/credenciales";
 
+prueba("organiza la preparación en pasos y permite volver sin perder la rúbrica", async () => {
+  const servicio = {evaluacion:async()=>({id:'pc',titulo:'PC',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[],materiales_apoyo:[],examenes_estudiantes:[]})} as unknown as ServicioBiblioteca;
+  representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={false} alVolver={()=>{}} />);
+  await pantalla.findByRole('heading',{name:'PC'});
+  esperar(pantalla.getByLabelText('Solución oficial')).toBeInTheDocument();
+  disparar.click(pantalla.getByRole('button',{name:/Paso 2.*Criterios/}));
+  disparar.click(pantalla.getByRole('button',{name:'Añadir pregunta'}));
+  esperar(pantalla.getByLabelText('Máximo P1')).toHaveValue(1);
+  disparar.click(pantalla.getByRole('button',{name:/Paso 1.*Archivos/}));
+  disparar.click(pantalla.getByRole('button',{name:/Paso 2.*Criterios/}));
+  esperar(pantalla.getByLabelText('Máximo P1')).toHaveValue(1);
+});
+
 prueba(
   "presenta solución materiales y exámenes sin iniciar llamadas de pago",
   async () => {
@@ -111,6 +124,7 @@ prueba("añade una pregunta sin repetir números existentes en la rúbrica", asy
   const servicio = { evaluacion: async () => ({ id: "pc", titulo: "PC", cursos: { nombre: "Curso" }, puntaje_total_maximo: 20, criterios_preguntas: [{numero_pregunta:1,puntaje_maximo:10,respuesta_esperada:"A"},{numero_pregunta:3,puntaje_maximo:10,respuesta_esperada:"B"}], soluciones_profesor: [], materiales_apoyo: [], examenes_estudiantes: [] }) } as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={false} alVolver={() => {}} />);
   await pantalla.findByRole("heading", {name:"PC"});
+  disparar.click(pantalla.getByRole("button", {name:/Paso 2.*Criterios/}));
   disparar.click(pantalla.getByRole("button", {name:"Añadir pregunta"}));
   esperar(pantalla.getByLabelText("Máximo P2")).toBeInTheDocument();
 });
