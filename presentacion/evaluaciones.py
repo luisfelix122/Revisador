@@ -78,8 +78,13 @@ class PeticionEstimacion(BaseModel):
     proveedor: str = Field(default="gemini", max_length=50)
 
 
+class ModeloPreparacion(BaseModel):
+    proveedor: Literal['gemini', 'openai']
+    modelo: str = Field(min_length=1, max_length=150)
+
+
 @enrutador.post('/{identificador}/preparar')
-async def preparar(identificador: UUID, repositorio: Repositorio):
+async def preparar(identificador: UUID, repositorio: Repositorio, peticion: ModeloPreparacion | None = None):
     evaluacion = await repositorio.evaluacion(identificador)
     if not evaluacion['soluciones_profesor']:
         raise HTTPException(422, 'Adjunta la solución oficial antes de calificar')
@@ -95,7 +100,9 @@ async def preparar(identificador: UUID, repositorio: Repositorio):
     costo_usd = None
     fuente_tarifas = None
     try:
-        tarifas = await ServicioTarifasOficiales().obtener_tarifa('gemini', 'gemini-flash-lite-latest')
+        if peticion is None:
+            raise ValueError('Falta el modelo para calcular el costo')
+        tarifas = await ServicioTarifasOficiales().obtener_tarifa(peticion.proveedor, peticion.modelo)
         tin = Decimal(str(tarifas['tarifa_entrada']))
         tout = Decimal(str(tarifas['tarifa_salida']))
         res = CalcularCostoEstimado().ejecutar(

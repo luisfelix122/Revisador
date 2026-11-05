@@ -137,22 +137,29 @@ BEGIN
     v_nombre_limpio := COALESCE(NULLIF(trim(p_nombre), ''), 'nada');
     v_codigo_limpio := COALESCE(NULLIF(trim(p_codigo), ''), 'nada');
 
-    IF v_codigo_limpio = 'nada' THEN
+    IF lower(v_codigo_limpio) = 'nada' THEN
         RAISE EXCEPTION 'El código de estudiante es obligatorio para la entrega' USING errcode = '42200';
     END IF;
 
     SELECT id, recepcion_abierta, fecha_cierre_programada, permitir_reenvios_global, cantidad_estudiantes_esperados
     INTO v_eval
     FROM public.evaluaciones
-    WHERE token_recepcion = p_token;
+    WHERE token_recepcion = p_token
+    FOR UPDATE;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Evaluación no encontrada' USING errcode = '40400';
     END IF;
 
     -- Validar si está abierta y dentro del tiempo límite
-    IF NOT v_eval.recepcion_abierta OR (v_eval.fecha_cierre_programada IS NOT NULL AND NOW() > v_eval.fecha_cierre_programada) THEN
+    IF NOT v_eval.recepcion_abierta OR (v_eval.fecha_cierre_programada IS NOT NULL AND clock_timestamp() > v_eval.fecha_cierre_programada) THEN
         RAISE EXCEPTION 'La recepción de entregas para esta evaluación se encuentra cerrada.' USING errcode = '42300';
+    END IF;
+
+    IF p_ruta NOT LIKE 'estudiantes/' || v_eval.id::text || '/%' OR NOT EXISTS (
+        SELECT 1 FROM storage.objects WHERE bucket_id = 'evaluaciones' AND name = p_ruta
+    ) THEN
+        RAISE EXCEPTION 'El archivo de la entrega no existe.' USING errcode = '42200';
     END IF;
 
     -- Verificar si el alumno ya realizó una entrega previa
@@ -183,7 +190,7 @@ BEGIN
         -- Validar si se ha alcanzado la cantidad de estudiantes esperados en aula
         IF v_eval.cantidad_estudiantes_esperados IS NOT NULL AND 
            (SELECT COUNT(*) FROM public.examenes_estudiantes WHERE evaluacion_id = v_eval.id) >= v_eval.cantidad_estudiantes_esperados THEN
-            RAISE EXCEPTION 'Se ha alcanzado el límite de estudiantes esperados (% alumnos) para este examen. Si estás en el aula, consulta con tu docente.' 
+            RAISE EXCEPTION 'Se ha alcanzado el límite de estudiantes esperados (% alumnos) para este examen. Si estás en el aula, consulta con tu docente.', v_eval.cantidad_estudiantes_esperados
                 USING errcode = '42301';
         END IF;
 
@@ -231,8 +238,13 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.registrar_entrega_estudiante(UUID, TEXT, TEXT, TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.registrar_entrega_estudiante(UUID, TEXT, TEXT, TEXT) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.registrar_entrega_estudiante(UUID, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.registrar_entrega_estudiante(UUID, TEXT, TEXT, TEXT) TO service_role;
+
+-- Los exámenes del portal siguen siendo privados y solo los lee el dueño de la evaluación.
+CREATE POLICY archivos_entregas_docente ON storage.objects FOR SELECT TO authenticated
+    USING (bucket_id = 'evaluaciones' AND (storage.foldername(name))[1] = 'estudiantes'
+        AND EXISTS (SELECT 1 FROM public.evaluaciones e WHERE e.id::text = (storage.foldername(name))[2]));
 
 -- Función docente para cambiar estado de recepción (abrir/cerrar/reabrir/tiempo)
 CREATE OR REPLACE FUNCTION public.configurar_recepcion_docente(
@@ -249,10 +261,16 @@ SET search_path = ''
 AS $$
 DECLARE
     v_fecha_cierre TIMESTAMP WITH TIME ZONE;
+    v_actual RECORD;
 BEGIN
     PERFORM privado.exigir_propiedad(p_evaluacion);
 
-    IF p_abierta AND p_tiempo_minutos IS NOT NULL AND p_tiempo_minutos > 0 THEN
+    SELECT recepcion_abierta, tiempo_limite_minutos, fecha_cierre_programada
+    INTO v_actual FROM public.evaluaciones WHERE id = p_evaluacion FOR UPDATE;
+
+    IF p_abierta AND v_actual.recepcion_abierta AND p_tiempo_minutos IS NOT DISTINCT FROM v_actual.tiempo_limite_minutos THEN
+        v_fecha_cierre := v_actual.fecha_cierre_programada;
+    ELSIF p_abierta AND p_tiempo_minutos IS NOT NULL AND p_tiempo_minutos > 0 THEN
         v_fecha_cierre := NOW() + (p_tiempo_minutos || ' minutes')::INTERVAL;
     ELSE
         v_fecha_cierre := NULL;

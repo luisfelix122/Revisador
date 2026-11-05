@@ -71,6 +71,7 @@ export function DetalleEvaluacion({
     [pestanaActiva, cambiarPestanaActiva] = usarEstado<"recepcion" | "docente">("docente"),
     [revisando, revisar] = usarEstado<Examen | null>(null);
   const detener = usarReferencia(false);
+  const examenesPreparados = usarReferencia<Examen[] | null>(null);
   const configuracionEstimada = usarReferencia<{proveedor: string; clave_api: string; modelo: string; claves_adicionales?: string[]} | null>(null);
   const cargar = usarCallback(async () => {
     const datos = await servicio.evaluacion(identificador);
@@ -192,17 +193,18 @@ export function DetalleEvaluacion({
       ocupar(false);
     }
   };
-  const preparar = async () => {
+  const preparar = async (examenes?: Examen[]) => {
     ocupar(true);
     mostrarError("");
     invalidar();
     try {
       const configuracion = credenciales();
       const resultado = await servicio.datos<Preparacion>(
-        `/evaluaciones/${identificador}/preparar`, { method: "POST" },
+        `/evaluaciones/${identificador}/preparar`, { method: "POST", body: JSON.stringify({ proveedor: configuracion.proveedor, modelo: configuracion.modelo }) },
       );
       configuracionEstimada.current = configuracion;
-      cambiarEstimacion(resultado);
+      examenesPreparados.current = examenes ?? null;
+      cambiarEstimacion(examenes ? { ...resultado, examenes: examenes.length, costo_usd: undefined } : resultado);
     } catch (problema) {
       mostrarError(mensaje(problema));
     } finally {
@@ -229,7 +231,7 @@ export function DetalleEvaluacion({
       confirmar_costo: true,
       huella: estimacion.huella,
     };
-    const pendientes = evaluacion.examenes_estudiantes.filter(
+    const pendientes = examenesPreparados.current ?? evaluacion.examenes_estudiantes.filter(
       (e) => e.estado_revision !== "completado",
     );
     let indice = 0;
@@ -244,6 +246,9 @@ export function DetalleEvaluacion({
       while (!detener.current && indice < pendientes.length) {
         const examen = pendientes[indice++];
         try {
+          if (examen.estado_revision === "completado") {
+            await servicio.reiniciarExamen(identificador, examen.id);
+          }
           await servicio.datos(
             `/evaluaciones/${identificador}/calificar/${examen.id}`,
             { method: "POST", body: JSON.stringify(parametros) },
@@ -306,77 +311,8 @@ export function DetalleEvaluacion({
       return;
     }
 
-    let configuracion;
-    try {
-      configuracion = credenciales();
-    } catch (problema) {
-      mostrarError(mensaje(problema));
-      return;
-    }
-
-    ocupar(true);
-    mostrarError("");
-    avisar("");
-
-    try {
-      if (modo === "todos" || modo === "seleccionados") {
-        for (const examen of examenesAProcesar) {
-          if (examen.estado_revision === "completado") {
-            await servicio.reiniciarExamen(identificador, examen.id).catch(() => {});
-          }
-        }
-      }
-
-      const prep = await servicio.datos<Preparacion>(
-        `/evaluaciones/${identificador}/preparar`,
-        { method: "POST" },
-      );
-
-      const parametros = {
-        ...configuracion,
-        confirmar_costo: true,
-        huella: prep.huella,
-      };
-
-      let indice = 0;
-      const fallos: string[] = [];
-      detener.current = false;
-      correr(true);
-      avisar(`Iniciando calificación de ${examenesAProcesar.length} examen(es)...`);
-
-      const trabajador = async () => {
-        while (!detener.current && indice < examenesAProcesar.length) {
-          const examen = examenesAProcesar[indice++];
-          try {
-            await servicio.datos(
-              `/evaluaciones/${identificador}/calificar/${examen.id}`,
-              { method: "POST", body: JSON.stringify(parametros) },
-            );
-          } catch (problema) {
-            fallos.push(mensaje(problema));
-          }
-          await cargar().catch(() => {});
-        }
-      };
-
-      await Promise.all([trabajador(), trabajador()]);
-
-      correr(false);
-      if (fallos.length) {
-        mostrarError(`${fallos.length} examen(es) no completados. ${fallos[0]}`);
-      }
-      avisar(
-        detener.current
-          ? "Calificación detenida."
-          : "Calificación completada exitosamente.",
-      );
-      await cargar().catch(() => {});
-    } catch (problema) {
-      mostrarError(mensaje(problema));
-    } finally {
-      ocupar(false);
-      correr(false);
-    }
+    cambiarPestanaActiva("docente");
+    await preparar(examenesAProcesar);
   };
   const descargar = async () => {
     ocupar(true);
@@ -786,10 +722,10 @@ export function DetalleEvaluacion({
         </button>
         {estimacion && (
           <div className="resultado-costo">
-            <strong>{estimacion.examenes} {estimacion.examenes === 1 ? "examen pendiente" : "exámenes pendientes"}</strong>
+            <strong>{estimacion.examenes} {estimacion.examenes === 1 ? "examen para revisar" : "exámenes para revisar"}</strong>
             {estimacion.costo_usd && (
               <p style={{ margin: "6px 0", color: "#137333", fontWeight: 600 }}>
-                Costo estimado oficial: ~${Number(estimacion.costo_usd).toFixed(4)} USD
+                Costo estimado: ~${Number(estimacion.costo_usd).toFixed(4)} USD
                 {estimacion.fuente_tarifas && (
                   <span style={{ fontSize: "12px", color: "#5f6368", display: "block", fontWeight: "normal" }}>
                     ({estimacion.fuente_tarifas})
@@ -797,6 +733,7 @@ export function DetalleEvaluacion({
                 )}
               </p>
             )}
+            {!estimacion.costo_usd && <p>No hay una estimación automática disponible para esta selección. Consulta las tarifas del proveedor antes de continuar.</p>}
             <p>Se enviarán la solución, los materiales, las indicaciones y las fotos al proveedor seleccionado. La llamada puede consumir saldo.</p>
             <label className="casilla">
               <input type="checkbox" checked={consentimiento} onChange={(evento) => consentir(evento.target.checked)} />

@@ -5,6 +5,29 @@ from presentacion.dependencias import obtener_proveedor
 import httpx
 
 
+def test_preparacion_usa_tarifa_del_modelo_seleccionado(monkeypatch):
+    from uuid import uuid4
+    from unittest.mock import AsyncMock
+    from presentacion.seguridad import obtener_repositorio
+    from infraestructura.tarifas_ia import ServicioTarifasOficiales
+
+    identificador = str(uuid4())
+    evaluacion = {'id': identificador, 'puntaje_total_maximo': 20, 'indicaciones_profesor': '',
+        'soluciones_profesor': [{'ruta_almacenamiento': 'solucion', 'cantidad_paginas': 1}],
+        'materiales_apoyo': [], 'criterios_preguntas': [{'numero_pregunta': 1}],
+        'examenes_estudiantes': [{'estado_revision': 'pendiente', 'ruta_imagen_examen': 'examen'}]}
+    repositorio = type('RepositorioPrueba', (), {'evaluacion': AsyncMock(return_value=evaluacion)})()
+    tarifas = AsyncMock(return_value={'tarifa_entrada': '1', 'tarifa_salida': '2', 'fuente': 'tarifa de prueba'})
+    monkeypatch.setattr(ServicioTarifasOficiales, 'obtener_tarifa', tarifas)
+    aplicacion.dependency_overrides[obtener_repositorio] = lambda: repositorio
+    try:
+        respuesta = TestClient(aplicacion).post(f'/api/evaluaciones/{identificador}/preparar', json={'proveedor': 'openai', 'modelo': 'gpt-4o'})
+        assert respuesta.status_code == 200
+        tarifas.assert_awaited_once_with('openai', 'gpt-4o')
+    finally:
+        aplicacion.dependency_overrides.pop(obtener_repositorio, None)
+
+
 class ProveedorPrueba:
     async def comprobar(self, clave, modelo):
         return None
@@ -84,6 +107,12 @@ def test_debe_obtener_tarifas_oficiales_dinamicas():
     assert float(datos['tarifa_entrada']) > 0
     assert float(datos['tarifa_salida']) > 0
     assert 'ai.google.dev' in datos['fuente']
+
+
+def test_tarifa_desconocida_explica_que_no_hay_precio():
+    respuesta = TestClient(aplicacion).get('/api/configuracion/tarifas-oficiales?proveedor=openai&modelo=modelo-desconocido')
+    assert respuesta.status_code == 422
+    assert 'tarifa disponible' in respuesta.json()['detalle']
 
 
 def test_debe_comprobar_lote_de_claves(monkeypatch):

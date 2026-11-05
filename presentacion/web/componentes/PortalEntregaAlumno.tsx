@@ -1,4 +1,5 @@
 import { useState as usarEstado, useEffect as usarEfecto, useRef as usarReferencia } from "react";
+import { TiempoRestante } from "./TiempoRestante";
 import {
   Camera as Camara,
   Upload as Subir,
@@ -62,7 +63,7 @@ export function PortalEntregaAlumno({ token, alVolver }: Propiedades) {
       const respuesta = await fetch(`/api/recepcion/${token}`);
       const datos = await respuesta.json();
       if (!respuesta.ok) {
-        throw new Error(datos?.detalle ?? "No se pudo cargar la información de la evaluación.");
+        throw new Error(datos?.detalle ?? datos?.detail ?? "No se pudo cargar la información de la evaluación.");
       }
       cambiarInfo(datos);
     } catch (err) {
@@ -124,6 +125,7 @@ export function PortalEntregaAlumno({ token, alVolver }: Propiedades) {
       formulario.append("nombre", nombre.trim() || "nada");
       formulario.append("codigo", codigo.trim());
       formulario.append("archivo", archivo);
+      formulario.append("rotacion", String(rotacion));
 
       const respuesta = await fetch(`/api/recepcion/${token}/entregar`, {
         method: "POST",
@@ -131,7 +133,7 @@ export function PortalEntregaAlumno({ token, alVolver }: Propiedades) {
       });
       const datos = await respuesta.json();
       if (!respuesta.ok) {
-        throw new Error(datos?.detalle ?? "No se pudo procesar la entrega del examen.");
+        throw new Error(datos?.detalle ?? datos?.detail ?? "No se pudo procesar la entrega del examen.");
       }
       cambiarComprobante(datos);
     } catch (err) {
@@ -219,6 +221,7 @@ export function PortalEntregaAlumno({ token, alVolver }: Propiedades) {
             <Recargar size={13} /> Actualizar estado
           </button>
         </div>
+        {info.recepcion_abierta && <TiempoRestante fechaCierre={info.fecha_cierre} />}
       </header>
 
       {/* Comprobante de Entrega Exitosa */}

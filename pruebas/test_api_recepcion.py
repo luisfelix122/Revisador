@@ -7,6 +7,121 @@ from presentacion.api import aplicacion
 cliente = TestClient(aplicacion)
 
 
+def test_entrega_rechaza_si_no_existe_credencial_privada_del_servidor(monkeypatch):
+    from io import BytesIO
+    from PIL import Image
+
+    monkeypatch.delenv('SUPABASE_CLAVE_SECRETA', raising=False)
+    archivo = BytesIO()
+    Image.new('RGB', (20, 20), 'white').save(archivo, format='PNG')
+    with patch('infraestructura.supabase.RepositorioSupabase.rpc_publico', new_callable=AsyncMock) as rpc, \
+         patch('infraestructura.supabase.httpx.AsyncClient') as cliente_http:
+        rpc.return_value = {'evaluacion_id': str(uuid4()), 'recepcion_abierta': True}
+        respuesta = cliente.post(f'/api/recepcion/{uuid4()}/entregar', data={'nombre': 'Ana', 'codigo': '123'}, files={'archivo': ('examen.png', archivo.getvalue(), 'image/png')})
+        assert respuesta.status_code == 503
+        cliente_http.assert_not_called()
+
+
+def test_entrega_traduce_el_rechazo_de_aforo_de_supabase(monkeypatch):
+    from io import BytesIO
+    from PIL import Image
+
+    monkeypatch.setenv('SUPABASE_CLAVE_SECRETA', 'sb_secret_prueba')
+    archivo = BytesIO()
+    Image.new('RGB', (20, 20), 'white').save(archivo, format='PNG')
+    respuesta_supabase = MagicMock(status_code=400)
+    respuesta_supabase.json.return_value = {'code': '42301', 'message': 'Aforo completado'}
+    conexion = AsyncMock()
+    conexion.request.return_value = respuesta_supabase
+    fabrica = MagicMock()
+    fabrica.return_value.__aenter__ = AsyncMock(return_value=conexion)
+    fabrica.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch('infraestructura.supabase.RepositorioSupabase.rpc_publico', new_callable=AsyncMock, return_value={'evaluacion_id': str(uuid4()), 'recepcion_abierta': True}), \
+         patch('infraestructura.supabase.RepositorioSupabase.subir_archivo_publico', new_callable=AsyncMock, return_value='examen.jpg'), \
+         patch('infraestructura.supabase.RepositorioSupabase.borrar_archivo_recepcion', new_callable=AsyncMock), \
+         patch('infraestructura.supabase.httpx.AsyncClient', fabrica):
+        respuesta = cliente.post(f'/api/recepcion/{uuid4()}/entregar', data={'nombre': 'Ana', 'codigo': '123'}, files={'archivo': ('examen.png', archivo.getvalue(), 'image/png')})
+    assert respuesta.status_code == 423
+    assert respuesta.json()['detail'] == 'Aforo completado'
+
+
+def test_entrega_muestra_rechazo_de_reenvio_aunque_supabase_responda_500(monkeypatch):
+    from io import BytesIO
+    from PIL import Image
+
+    monkeypatch.setenv('SUPABASE_CLAVE_SECRETA', 'sb_secret_prueba')
+    archivo = BytesIO()
+    Image.new('RGB', (20, 20), 'white').save(archivo, format='PNG')
+    respuesta_supabase = MagicMock(status_code=500)
+    respuesta_supabase.json.return_value = {'code': '40900', 'message': 'Ya has realizado una entrega.'}
+    conexion = AsyncMock()
+    conexion.request.return_value = respuesta_supabase
+    fabrica = MagicMock()
+    fabrica.return_value.__aenter__ = AsyncMock(return_value=conexion)
+    fabrica.return_value.__aexit__ = AsyncMock(return_value=False)
+    with patch('infraestructura.supabase.RepositorioSupabase.rpc_publico', new_callable=AsyncMock, return_value={'evaluacion_id': str(uuid4()), 'recepcion_abierta': True}), \
+         patch('infraestructura.supabase.RepositorioSupabase.subir_archivo_publico', new_callable=AsyncMock, return_value='examen.jpg'), \
+         patch('infraestructura.supabase.RepositorioSupabase.borrar_archivo_recepcion', new_callable=AsyncMock), \
+         patch('infraestructura.supabase.httpx.AsyncClient', fabrica):
+        respuesta = cliente.post(f'/api/recepcion/{uuid4()}/entregar', data={'nombre': 'Ana', 'codigo': '123'}, files={'archivo': ('examen.png', archivo.getvalue(), 'image/png')})
+    assert respuesta.status_code == 409
+    assert respuesta.json()['detail'] == 'Ya has realizado una entrega.'
+
+
+def test_entrega_no_borra_archivo_si_no_se_conoce_resultado_del_registro():
+    from io import BytesIO
+    from PIL import Image
+    from infraestructura.supabase import ErrorPersistencia
+
+    archivo = BytesIO()
+    Image.new('RGB', (20, 20), 'white').save(archivo, format='PNG')
+    with patch('infraestructura.supabase.RepositorioSupabase.rpc_publico', new_callable=AsyncMock, return_value={'evaluacion_id': str(uuid4()), 'recepcion_abierta': True}), \
+         patch('infraestructura.supabase.RepositorioSupabase.subir_archivo_publico', new_callable=AsyncMock, return_value='examen.jpg'), \
+         patch('infraestructura.supabase.RepositorioSupabase.rpc_recepcion', new_callable=AsyncMock, side_effect=ErrorPersistencia('Conexión interrumpida', 503)), \
+         patch('infraestructura.supabase.RepositorioSupabase.borrar_archivo_recepcion', new_callable=AsyncMock) as borrar:
+        respuesta = cliente.post(f'/api/recepcion/{uuid4()}/entregar', data={'nombre': 'Ana', 'codigo': '123'}, files={'archivo': ('examen.png', archivo.getvalue(), 'image/png')})
+    assert respuesta.status_code == 503
+    borrar.assert_not_awaited()
+
+
+def test_entrega_conserva_pdf_completo():
+    from io import BytesIO
+    from PIL import Image
+
+    archivo = BytesIO()
+    Image.new('RGB', (20, 20), 'white').save(
+        archivo, format='PDF', save_all=True,
+        append_images=[Image.new('RGB', (20, 20), 'black')],
+    )
+    contenido = archivo.getvalue()
+    with patch('infraestructura.supabase.RepositorioSupabase.rpc_publico', new_callable=AsyncMock) as rpc, \
+         patch('infraestructura.supabase.RepositorioSupabase.rpc_recepcion', new_callable=AsyncMock, return_value={'numero_entrega': 1}), \
+         patch('infraestructura.supabase.RepositorioSupabase.subir_archivo_publico', new_callable=AsyncMock) as subir:
+        rpc.return_value = {'evaluacion_id': str(uuid4()), 'recepcion_abierta': True}
+        subir.return_value = 'estudiantes/examen.pdf'
+        respuesta = cliente.post(f'/api/recepcion/{uuid4()}/entregar', data={'nombre': 'Ana', 'codigo': '123'}, files={'archivo': ('examen.pdf', contenido, 'application/pdf')})
+        assert respuesta.status_code == 200
+        assert subir.call_args.args[1] == contenido
+        assert subir.call_args.args[0].endswith('.pdf')
+        assert subir.call_args.kwargs['tipo_mime'] == 'application/pdf'
+
+
+def test_entrega_aplica_rotacion_a_la_imagen():
+    from io import BytesIO
+    from PIL import Image
+
+    archivo = BytesIO()
+    Image.new('RGB', (40, 20), 'white').save(archivo, format='PNG')
+    with patch('infraestructura.supabase.RepositorioSupabase.rpc_publico', new_callable=AsyncMock) as rpc, \
+         patch('infraestructura.supabase.RepositorioSupabase.rpc_recepcion', new_callable=AsyncMock, return_value={'numero_entrega': 1}), \
+         patch('infraestructura.supabase.RepositorioSupabase.subir_archivo_publico', new_callable=AsyncMock) as subir:
+        rpc.return_value = {'evaluacion_id': str(uuid4()), 'recepcion_abierta': True}
+        subir.return_value = 'estudiantes/examen.jpg'
+        respuesta = cliente.post(f'/api/recepcion/{uuid4()}/entregar', data={'nombre': 'Ana', 'codigo': '123', 'rotacion': '90'}, files={'archivo': ('examen.png', archivo.getvalue(), 'image/png')})
+        assert respuesta.status_code == 200
+        assert Image.open(BytesIO(subir.call_args.args[1])).size == (20, 40)
+
+
 def test_obtener_info_recepcion_publica():
     token = str(uuid4())
     datos_mock = {
@@ -57,9 +172,11 @@ def test_entregar_examen_publico_exitoso():
 
     with patch("infraestructura.supabase.RepositorioSupabase.solicitar_publico", new_callable=AsyncMock) as mock_sol, \
          patch("infraestructura.supabase.RepositorioSupabase.rpc_publico", new_callable=AsyncMock) as mock_rpc, \
+         patch("infraestructura.supabase.RepositorioSupabase.rpc_recepcion", new_callable=AsyncMock) as mock_registro, \
          patch("infraestructura.supabase.RepositorioSupabase.subir_archivo_publico", new_callable=AsyncMock) as mock_up:
         
-        mock_rpc.side_effect = [datos_eval_mock, datos_registro_mock]
+        mock_rpc.return_value = datos_eval_mock
+        mock_registro.return_value = datos_registro_mock
         mock_up.return_value = "public/eval/examen_1.jpg"
 
         archivos = {"archivo": ("examen.png", img_bytes.getvalue(), "image/png")}
@@ -112,12 +229,12 @@ def test_entregar_examen_rechazado_si_cupo_superado():
     Image.new("RGB", (100, 100), color="white").save(img_bytes, format="PNG")
 
     with patch("infraestructura.supabase.RepositorioSupabase.rpc_publico", new_callable=AsyncMock) as mock_rpc, \
+         patch("infraestructura.supabase.RepositorioSupabase.rpc_recepcion", new_callable=AsyncMock) as mock_registro, \
+         patch("infraestructura.supabase.RepositorioSupabase.borrar_archivo_recepcion", new_callable=AsyncMock) as mock_borrar, \
          patch("infraestructura.supabase.RepositorioSupabase.subir_archivo_publico", new_callable=AsyncMock) as mock_up:
         
-        mock_rpc.side_effect = [
-            datos_eval_mock,
-            ErrorPersistencia("Se ha alcanzado el límite de estudiantes esperados (30 alumnos) para este examen. Si estás en el aula, consulta con tu docente.", 423)
-        ]
+        mock_rpc.return_value = datos_eval_mock
+        mock_registro.side_effect = ErrorPersistencia("Se ha alcanzado el límite de estudiantes esperados (30 alumnos) para este examen. Si estás en el aula, consulta con tu docente.", 423)
         mock_up.return_value = "public/eval/examen_31.jpg"
 
         archivos = {"archivo": ("examen.png", img_bytes.getvalue(), "image/png")}
@@ -126,4 +243,5 @@ def test_entregar_examen_rechazado_si_cupo_superado():
         respuesta = cliente.post(f"/api/recepcion/{token}/entregar", data=datos, files=archivos)
         assert respuesta.status_code == 423
         assert "límite de estudiantes esperados" in respuesta.json()["detail"]
+        mock_borrar.assert_awaited_once_with("public/eval/examen_31.jpg")
 

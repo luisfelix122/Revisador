@@ -1,11 +1,46 @@
-import { render as representar, screen as pantalla, fireEvent as disparar, waitFor as esperarQue } from "@testing-library/react";
+import { render as representar, screen as pantalla, fireEvent as disparar, waitFor as esperarQue, act as actuar } from "@testing-library/react";
 import { test as prueba, expect as esperar, vi as espia, beforeEach as antesDeCada } from "vitest";
 import { PortalEntregaAlumno } from "../componentes/PortalEntregaAlumno";
 import { RecepcionAlumnos } from "../componentes/RecepcionAlumnos";
+import { TiempoRestante } from "../componentes/TiempoRestante";
 import type { EvaluacionDetalle, ServicioBiblioteca } from "../servicios/biblioteca";
 
 antesDeCada(() => {
   espia.restoreAllMocks();
+});
+
+prueba("el alumno ve el tiempo restante de la recepción", async () => {
+  const ahora = Date.parse('2026-11-05T12:00:00Z');
+  espia.spyOn(Date, 'now').mockReturnValue(ahora);
+  globalThis.fetch = espia.fn().mockResolvedValue({ok:true, json:async()=>({titulo:'Examen con plazo', curso:'Curso', facultad:'Facultad', escuela:'Escuela', anio:2026, puntaje_maximo:20, recepcion_abierta:true, fecha_cierre:'2026-11-05T12:02:05Z'})});
+  representar(<PortalEntregaAlumno token="token" />);
+  esperar(await pantalla.findByText(/Tiempo restante estimado: 02:05/)).toBeInTheDocument();
+});
+
+prueba("el portal muestra el motivo cuando el enlace no está disponible", async () => {
+  globalThis.fetch = espia.fn().mockResolvedValue({ok:false, json:async()=>({detail:'Evaluación no encontrada'})});
+  representar(<PortalEntregaAlumno token="invalido" />);
+  esperar(await pantalla.findByText('Evaluación no encontrada')).toBeInTheDocument();
+});
+
+prueba("la cuenta regresiva avanza y al terminar pide actualizar el estado", () => {
+  espia.useFakeTimers();
+  try {
+    espia.setSystemTime(new Date('2026-11-05T12:00:00Z'));
+    representar(<TiempoRestante fechaCierre="2026-11-05T12:00:02Z" />);
+    esperar(pantalla.getByText(/Tiempo restante estimado: 00:02/)).toBeInTheDocument();
+    actuar(() => espia.advanceTimersByTime(2000));
+    esperar(pantalla.getByText(/Tiempo estimado agotado/)).toBeInTheDocument();
+  } finally {
+    espia.useRealTimers();
+  }
+});
+
+prueba("el docente ve el tiempo restante de la recepción", () => {
+  espia.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-11-05T12:00:00Z'));
+  const evaluacion = {id:'pc', titulo:'Examen', indicaciones_profesor:'', puntaje_total_maximo:20, estado:'borrador', criterios_preguntas:[], soluciones_profesor:[], materiales_apoyo:[], cursos:{id:'c',nombre:'Curso',evaluaciones:[]}, recepcion_abierta:true, fecha_cierre_programada:'2026-11-05T12:02:05Z', examenes_estudiantes:[]} as EvaluacionDetalle;
+  representar(<RecepcionAlumnos evaluacion={evaluacion} servicio={{} as ServicioBiblioteca} apiVerificada={false} alActualizar={async()=>{}} alRevisarExamen={()=>{}} alCalificarLote={async()=>{}} ocupado={false} corriendo={false} />);
+  esperar(pantalla.getByText(/Tiempo restante estimado: 02:05/)).toBeInTheDocument();
 });
 
 prueba("PortalEntregaAlumno muestra jerarquía académica y botón deshabilitado sin archivo", async () => {
@@ -41,6 +76,16 @@ prueba("PortalEntregaAlumno muestra jerarquía académica y botón deshabilitado
   // El botón de entregar debe estar deshabilitado hasta que se seleccione archivo
   const botonEntregar = pantalla.getByRole("button", { name: /Confirmar y entregar examen/i });
   esperar(botonEntregar).toBeDisabled();
+});
+
+prueba("PortalEntregaAlumno muestra el motivo concreto si se rechaza una entrega", async () => {
+  globalThis.fetch = espia.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ titulo: 'Examen', curso: 'Curso', facultad: 'Facultad', escuela: 'Escuela', anio: 2026, puntaje_maximo: 20, recepcion_abierta: true }) }).mockResolvedValueOnce({ ok: false, json: async () => ({ detail: 'Solicita autorización para reenviar.' }) });
+  const { container } = representar(<PortalEntregaAlumno token="token" />);
+  await pantalla.findByText('Examen');
+  disparar.change(pantalla.getByLabelText(/Código universitario/i), { target: { value: '123' } });
+  disparar.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(['archivo'], 'examen.pdf', { type: 'application/pdf' })] } });
+  disparar.click(pantalla.getByRole('button', { name: /Confirmar y entregar examen/i }));
+  esperar(await pantalla.findByText('Solicita autorización para reenviar.')).toBeInTheDocument();
 });
 
 prueba("PortalEntregaAlumno permite previsualizar y rotar foto antes de confirmar", async () => {
@@ -103,6 +148,9 @@ prueba("PortalEntregaAlumno permite previsualizar y rotar foto antes de confirma
   const botonEntregar = pantalla.getByRole("button", { name: /Confirmar y entregar examen/i });
   esperar(botonEntregar).not.toBeDisabled();
   disparar.click(botonEntregar);
+
+  const peticionEntrega = espia.mocked(globalThis.fetch).mock.calls.find(([url]) => String(url).includes('/entregar'));
+  esperar((peticionEntrega?.[1]?.body as FormData).get('rotacion')).toBe('90');
 
   // Esperar confirmación de entrega
   await esperarQue(() => {

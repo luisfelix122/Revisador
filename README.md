@@ -51,6 +51,8 @@ Las pruebas usan dobles únicamente en la frontera de proveedores externos; no c
 
 ## Supabase
 
+La recepción de alumnos requiere configurar `SUPABASE_CLAVE_SECRETA` únicamente en el entorno del servidor con una clave secreta del proyecto Supabase. Nunca debe añadirse al frontend, al repositorio ni a un archivo público. La API usa esa credencial exclusivamente para subir y registrar entregas; ante un rechazo confirmado intenta limpiar el archivo. El bucket permanece privado y el docente accede mediante su sesión. Sin esta variable, la API rechaza las entregas con un error de configuración. Las migraciones de recepción y restricción de funciones ya se aplicaron en el proyecto remoto; para otras bases deben aplicarse las migraciones locales correspondientes.
+
 Proyecto separado **revisador** (`xjmglxauhhgrkcowqgjm`), región São Paulo, creado con costo indicado de 0 USD/mes confirmado por el usuario. Migraciones aplicadas: `20261103221122_biblioteca_academica_3nf.sql` y `20261103223437_flujo_completo_seguro.sql`.
 
 El año es único por profesor, no globalmente. Los descendientes heredan acceso mediante la visibilidad RLS de su padre, sin repetir el propietario en cada tabla. El navegador no utiliza claves privilegiadas. La escritura de archivos y resultados utiliza operaciones transaccionales que comprueban la propiedad.

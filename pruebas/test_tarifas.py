@@ -28,8 +28,7 @@ async def test_obtener_tarifas_con_fallback_si_falla_red():
 
 
 @pytest.mark.anyio
-async def test_obtener_tarifas_modelo_desconocido_usa_base():
+async def test_obtener_tarifas_modelo_desconocido_no_inventa_precio():
     servicio = ServicioTarifasOficiales()
-    tarifas = await servicio.obtener_tarifa("gemini", "modelo-nuevo-desconocido")
-    assert tarifas["tarifa_entrada"] > 0
-    assert tarifas["tarifa_salida"] > 0
+    with pytest.raises(ValueError, match="tarifa"):
+        await servicio.obtener_tarifa("gemini", "modelo-nuevo-desconocido")

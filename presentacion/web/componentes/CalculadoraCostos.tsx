@@ -1,4 +1,4 @@
-import { useState as usarEstado, useEffect as usarEfecto } from "react";
+import { useState as usarEstado, useRef as usarReferencia } from "react";
 import { Coins as Monedas, RefreshCw as Recargar } from "lucide-react";
 import { consultarTarifasOficiales, type TarifasOficiales } from "../servicios/api";
 import { leerCredenciales } from "../servicios/credenciales";
@@ -25,25 +25,27 @@ export function CalculadoraCostos() {
     configuracion.modelo || "gemini-flash-lite-latest",
   );
   const modeloActual = configuracion.modelo || "gemini-flash-lite-latest";
-  const tarifasIniciales = TARIFAS_DEFECTO[modeloActual] || { entrada: "0.30", salida: "2.50" };
+  const tarifasIniciales = configuracion.proveedor === 'openai' ? undefined : TARIFAS_DEFECTO[modeloActual];
   const [examenes, cambiarExamenes] = usarEstado("20");
   const [contexto, cambiarContexto] = usarEstado("2000");
-  const [entrada, cambiarEntrada] = usarEstado(tarifasIniciales.entrada);
-  const [salida, cambiarSalida] = usarEstado(tarifasIniciales.salida);
+  const [entrada, cambiarEntrada] = usarEstado(tarifasIniciales?.entrada ?? "");
+  const [salida, cambiarSalida] = usarEstado(tarifasIniciales?.salida ?? "");
   const [tarifasInfo, cambiarTarifasInfo] = usarEstado<TarifasOficiales | null>(null);
   const [resultado, cambiarResultado] = usarEstado<string | null>(null);
   const [ocupada, ocupar] = usarEstado(false);
   const [cargandoTarifas, cambiarCargandoTarifas] = usarEstado(false);
   const [error, mostrarError] = usarEstado("");
+  const solicitudTarifas = usarReferencia(0);
 
   const cargarTarifas = async (modelo: string) => {
+    const solicitud = ++solicitudTarifas.current;
     cambiarCargandoTarifas(true);
     try {
       const datos = await consultarTarifasOficiales(
         configuracion.proveedor || "gemini",
         modelo,
       );
-      if (datos && datos.tarifa_entrada && datos.tarifa_salida) {
+      if (solicitud === solicitudTarifas.current && datos && datos.tarifa_entrada && datos.tarifa_salida) {
         cambiarTarifasInfo(datos);
         cambiarEntrada(datos.tarifa_entrada);
         cambiarSalida(datos.tarifa_salida);
@@ -51,7 +53,7 @@ export function CalculadoraCostos() {
     } catch {
       // Si falla, se pueden ingresar manualmente
     } finally {
-      cambiarCargandoTarifas(false);
+      if (solicitud === solicitudTarifas.current) cambiarCargandoTarifas(false);
     }
   };
 
@@ -99,8 +101,7 @@ export function CalculadoraCostos() {
   return (
     <section aria-label="Estimador de costos">
       <p className="descripcion">
-        Planifica tu presupuesto antes de calificar. Los precios se obtienen en
-        vivo directamente de la documentación oficial de Google Gemini.
+        Planifica tu presupuesto antes de calificar. Comprueba las tarifas del modelo con tu proveedor antes de calcular.
       </p>
 
       <label style={{ marginBottom: "12px", display: "block" }}>
@@ -110,15 +111,17 @@ export function CalculadoraCostos() {
           onChange={(e) => {
             const nuevoModelo = e.target.value;
             cambiarModeloSeleccionado(nuevoModelo);
-            if (TARIFAS_DEFECTO[nuevoModelo]) {
-              cambiarEntrada(TARIFAS_DEFECTO[nuevoModelo].entrada);
-              cambiarSalida(TARIFAS_DEFECTO[nuevoModelo].salida);
-            }
+            cambiarTarifasInfo(null);
+            cambiarEntrada("");
+            cambiarSalida("");
             void cargarTarifas(nuevoModelo);
             cambiarResultado(null);
           }}
         >
-          {MODELOS_COMUNES.map((m) => (
+          {configuracion.modelo && !MODELOS_COMUNES.some((modelo) => modelo.id === configuracion.modelo) && (
+            <option value={configuracion.modelo}>{configuracion.modelo}</option>
+          )}
+          {configuracion.proveedor !== 'openai' && MODELOS_COMUNES.map((m) => (
             <option key={m.id} value={m.id}>
               {m.etiqueta}
             </option>
@@ -144,7 +147,7 @@ export function CalculadoraCostos() {
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <Monedas size={16} />
             <span>
-              Tarifas oficiales: <strong>${tarifasInfo.tarifa_entrada}</strong> entrada /{" "}
+              Tarifas de referencia: <strong>${tarifasInfo.tarifa_entrada}</strong> entrada /{" "}
               <strong>${tarifasInfo.tarifa_salida}</strong> salida por 1M tokens
             </span>
           </div>
@@ -201,6 +204,9 @@ export function CalculadoraCostos() {
             placeholder="Ej. 0.30"
             value={entrada}
             onChange={(evento) => {
+              solicitudTarifas.current++;
+              cambiarCargandoTarifas(false);
+              cambiarTarifasInfo(null);
               cambiarEntrada(evento.target.value);
               cambiarResultado(null);
             }}
@@ -215,6 +221,9 @@ export function CalculadoraCostos() {
             placeholder="Ej. 2.50"
             value={salida}
             onChange={(evento) => {
+              solicitudTarifas.current++;
+              cambiarCargandoTarifas(false);
+              cambiarTarifasInfo(null);
               cambiarSalida(evento.target.value);
               cambiarResultado(null);
             }}
@@ -222,7 +231,7 @@ export function CalculadoraCostos() {
         </label>
       </div>
       <p className="ayuda-campo">
-        Tarifas oficiales en vivo ({tarifasInfo?.fuente || "ai.google.dev/pricing"}). No es una cotización: el costo real depende de las imágenes y tokens del modelo.
+        Las tarifas pueden cambiar. No es una cotización: el costo real depende de las imágenes y tokens del modelo.
       </p>
       {error && (
         <p className="error" role="alert">
@@ -233,7 +242,7 @@ export function CalculadoraCostos() {
         <div className="resultado-costo" role="status">
           <span>Costo aproximado del lote ({examenes} exámenes)</span>
           <strong>${resultado} USD</strong>
-          <span>Calculado con tarifas oficiales de {modeloSeleccionado}.</span>
+          <span>Calculado con las tarifas indicadas para {modeloSeleccionado}.</span>
         </div>
       )}
       <button

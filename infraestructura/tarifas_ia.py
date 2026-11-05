@@ -100,11 +100,9 @@ class ServicioTarifasOficiales:
                 fuente = "ai.google.dev/pricing (oficial en vivo)"
             elif modelo_limpio in self.TARIFAS_BASE_GEMINI:
                 entrada, salida = self.TARIFAS_BASE_GEMINI[modelo_limpio]
-                fuente = "ai.google.dev/pricing (catálogo oficial sincronizado)"
+                fuente = "ai.google.dev/pricing (tarifas de respaldo; verifica el precio actual)"
             else:
-                # Default a flash-lite si es un modelo no catalogado
-                entrada, salida = Decimal("0.30"), Decimal("2.50")
-                fuente = "ai.google.dev/pricing (tarifa base estándar)"
+                raise ValueError("No hay una tarifa disponible para este modelo")
 
             return {
                 "proveedor": "gemini",
@@ -116,11 +114,10 @@ class ServicioTarifasOficiales:
                 "fuente": fuente,
             }
 
-        # Proveedor OpenAI
-        if modelo_limpio in self.TARIFAS_BASE_OPENAI:
+        if proveedor_limpio == "openai" and modelo_limpio in self.TARIFAS_BASE_OPENAI:
             entrada, salida = self.TARIFAS_BASE_OPENAI[modelo_limpio]
         else:
-            entrada, salida = Decimal("0.15"), Decimal("0.60")
+            raise ValueError("No hay una tarifa disponible para este modelo")
 
         return {
             "proveedor": "openai",
@@ -129,5 +126,5 @@ class ServicioTarifasOficiales:
             "tarifa_salida": salida,
             "moneda": "USD",
             "unidad": "por millón de tokens",
-            "fuente": "openai.com/pricing (catálogo oficial)",
+            "fuente": "openai.com/pricing (tarifas de respaldo; verifica el precio actual)",
         }

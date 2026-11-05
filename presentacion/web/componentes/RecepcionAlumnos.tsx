@@ -1,4 +1,5 @@
 import { useState as usarEstado, useEffect as usarEfecto, useRef as usarReferencia } from "react";
+import { TiempoRestante } from "./TiempoRestante";
 import {
   Link as EnlaceIcon,
   Copy as Copiar,
@@ -298,6 +299,7 @@ export function RecepcionAlumnos({
           </div>
         </div>
 
+        {evaluacion.recepcion_abierta && <TiempoRestante fechaCierre={evaluacion.fecha_cierre_programada} />}
         {/* Control de Aforo / Alumnos presentes en aula */}
         <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px solid #f1f3f4" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>

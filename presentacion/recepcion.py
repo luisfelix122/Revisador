@@ -1,6 +1,7 @@
 import base64
 from io import BytesIO
 from uuid import UUID, uuid4
+from PIL import Image
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from infraestructura.archivos import ExtraerDocumento
 from infraestructura.supabase import RepositorioSupabase, ErrorPersistencia
@@ -27,12 +28,15 @@ async def entregar_examen(
     token: UUID,
     nombre: str = Form(...),
     codigo: str = Form(...),
-    archivo: UploadFile = File(...)
+    archivo: UploadFile = File(...),
+    rotacion: int = Form(0),
 ):
     nombre_limpio = (nombre or "").strip()
     codigo_limpio = (codigo or "").strip()
     if not codigo_limpio:
         raise HTTPException(422, "El código de estudiante es obligatorio.")
+    if rotacion not in (0, 90, 180, 270):
+        raise HTTPException(422, "La rotación debe ser 0, 90, 180 o 270 grados.")
 
     # 1. Obtener información de la evaluación
     try:
@@ -59,23 +63,29 @@ async def entregar_examen(
         raise HTTPException(422, str(err)) from None
 
     # 3. Guardar imagen activa en storage público
-    primera_imagen_b64 = doc.imagenes[0]
-    imagen_bytes = base64.b64decode(primera_imagen_b64)
+    es_pdf = doc.tipo == 'pdf'
+    imagen_bytes = contenido if es_pdf else base64.b64decode(doc.imagenes[0])
+    if not es_pdf and rotacion:
+        with Image.open(BytesIO(imagen_bytes)) as imagen:
+            salida = BytesIO()
+            imagen.rotate(-rotacion, expand=True).save(salida, format='JPEG', quality=85)
+            imagen_bytes = salida.getvalue()
     evaluacion_id = info["evaluacion_id"]
-    nombre_guardado = f"estudiantes/{evaluacion_id}/{codigo_limpio}_{uuid4().hex[:8]}.jpg"
+    extension = 'pdf' if es_pdf else 'jpg'
+    nombre_guardado = f"estudiantes/{evaluacion_id}/{uuid4().hex}.{extension}"
 
     try:
         ruta_storage = await RepositorioSupabase.subir_archivo_publico(
             nombre_guardado,
             imagen_bytes,
-            tipo_mime="image/jpeg"
+            tipo_mime="application/pdf" if es_pdf else "image/jpeg"
         )
     except ErrorPersistencia as err:
         raise HTTPException(err.estado, err.detalle) from None
 
     # 4. Registrar entrega atómicamente en la base de datos
     try:
-        registro = await RepositorioSupabase.rpc_publico(
+        registro = await RepositorioSupabase.rpc_recepcion(
             "registrar_entrega_estudiante",
             {
                 "p_token": str(token),
@@ -86,4 +96,9 @@ async def entregar_examen(
         )
         return registro
     except ErrorPersistencia as err:
+        if 400 <= err.estado < 500:
+            try:
+                await RepositorioSupabase.borrar_archivo_recepcion(ruta_storage)
+            except ErrorPersistencia:
+                pass
         raise HTTPException(err.estado, err.detalle) from None

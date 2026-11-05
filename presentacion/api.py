@@ -78,7 +78,10 @@ async def listar_modelos(configuracion: ConfiguracionIA, respuesta: Response, pr
 @aplicacion.get("/api/configuracion/tarifas-oficiales")
 async def tarifas_oficiales(proveedor: str = "gemini", modelo: str = "gemini-flash-lite-latest", respuesta: Response = None):
     servicio = ServicioTarifasOficiales()
-    resultado = await servicio.obtener_tarifa(proveedor, modelo)
+    try:
+        resultado = await servicio.obtener_tarifa(proveedor, modelo)
+    except ValueError:
+        return JSONResponse(status_code=422, content={'detalle': 'No hay una tarifa disponible para este modelo. Introduce las tarifas manualmente.'})
     if respuesta:
         respuesta.headers["Cache-Control"] = "public, max-age=1800"
     return resultado

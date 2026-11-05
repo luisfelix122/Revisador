@@ -1,4 +1,4 @@
-"""Cliente por solicitud: nunca usa service_role ni comparte sesiones."""
+"""Clientes por solicitud para sesiones docentes y recepción pública."""
 import os
 from dataclasses import dataclass
 from uuid import UUID
@@ -56,11 +56,18 @@ class RepositorioSupabase:
             raise ErrorPersistencia('No se pudo conectar con el portal de entregas. Inténtalo otra vez.') from None
         if respuesta.status_code >= 400:
             mensaje_servidor = None
+            codigo_servidor = None
             try:
                 cuerpo_error = respuesta.json()
                 mensaje_servidor = cuerpo_error.get('message') or cuerpo_error.get('details')
+                codigo_servidor = cuerpo_error.get('code')
             except Exception:
                 pass
+            estado = {'42300': 423, '42301': 423, '40900': 409, '40400': 404, '42200': 422}.get(codigo_servidor)
+            if estado and mensaje_servidor:
+                raise ErrorPersistencia(mensaje_servidor, estado)
+            if respuesta.status_code >= 500:
+                raise ErrorPersistencia('El servicio de entregas no está disponible.', 503)
             if mensaje_servidor:
                 raise ErrorPersistencia(mensaje_servidor, 423 if respuesta.status_code == 423 else (409 if respuesta.status_code == 409 else 422))
             if respuesta.status_code == 404:
@@ -76,9 +83,29 @@ class RepositorioSupabase:
     async def rpc_publico(cls, funcion: str, datos: dict):
         return await cls.solicitar_publico('POST', '/rest/v1/rpc/' + funcion, datos=datos)
 
+    @staticmethod
+    def clave_recepcion():
+        clave = os.getenv('SUPABASE_CLAVE_SECRETA', '').strip()
+        if not clave:
+            raise ErrorPersistencia('La recepción de alumnos aún no está configurada en el servidor.', 503)
+        return clave
+
+    @classmethod
+    def cabeceras_recepcion(cls):
+        clave = cls.clave_recepcion()
+        cabeceras = {'apikey': clave}
+        if not clave.startswith('sb_secret_'):
+            cabeceras['Authorization'] = f'Bearer {clave}'
+        return cabeceras
+
+    @classmethod
+    async def rpc_recepcion(cls, funcion: str, datos: dict):
+        return await cls.solicitar_publico('POST', '/rest/v1/rpc/' + funcion, datos=datos,
+            cabeceras=cls.cabeceras_recepcion())
+
     @classmethod
     async def subir_archivo_publico(cls, ruta: str, contenido: bytes, tipo_mime: str = 'image/jpeg'):
-        encabezados = {'apikey': CLAVE_PUBLICABLE, 'Content-Type': tipo_mime, 'x-upsert': 'true'}
+        encabezados = {**cls.cabeceras_recepcion(), 'Content-Type': tipo_mime, 'x-upsert': 'false'}
         try:
             async with httpx.AsyncClient(timeout=35, follow_redirects=False) as cliente:
                 respuesta = await cliente.post(
@@ -91,6 +118,11 @@ class RepositorioSupabase:
         if respuesta.status_code >= 400:
             raise ErrorPersistencia('No se pudo almacenar el archivo de examen.', 422)
         return ruta
+
+    @classmethod
+    async def borrar_archivo_recepcion(cls, ruta: str):
+        await cls.solicitar_publico('DELETE', '/storage/v1/object/evaluaciones',
+            datos={'prefixes': [ruta]}, cabeceras=cls.cabeceras_recepcion())
 
     async def evaluacion(self, identificador: UUID) -> dict:
         filas = await self.solicitar('GET', f'/rest/v1/evaluaciones?id=eq.{identificador}&select=*,cursos(*,promociones_ciclos(*,escuelas(*,facultades(*,anios_academicos(*))))),soluciones_profesor(*),materiales_apoyo(*),criterios_preguntas(*),examenes_estudiantes(*,detalles_preguntas(*),historial_entregas_estudiantes(*))')
