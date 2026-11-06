@@ -7,17 +7,30 @@ insert into public.escuelas(id,facultad_id,nombre) values('c1111111-1111-4111-81
 insert into public.promociones_ciclos(id,escuela_id,denominacion) values('d1111111-1111-4111-8111-111111111111','c1111111-1111-4111-8111-111111111111','Ciclo');
 insert into public.cursos(id,promocion_ciclo_id,nombre) values('e1111111-1111-4111-8111-111111111111','d1111111-1111-4111-8111-111111111111','Curso');
 insert into public.evaluaciones(id,curso_id,titulo,puntaje_total_maximo,token_recepcion) values('f1111111-1111-4111-8111-111111111111','e1111111-1111-4111-8111-111111111111','Evaluación',20,'99999999-9999-4999-8999-999999999999');
+insert into public.evaluaciones(id,curso_id,titulo,puntaje_total_maximo) values('f2222222-2222-4222-8222-222222222222','e1111111-1111-4111-8111-111111111111','Evaluación sobre cien',100);
 insert into storage.objects(bucket_id,name) values
  ('evaluaciones','11111111-1111-4111-8111-111111111111/f1111111-1111-4111-8111-111111111111/manual.jpg'),
  ('evaluaciones','estudiantes/f1111111-1111-4111-8111-111111111111/estudiante.pdf'),
  ('evaluaciones','estudiantes/f1111111-1111-4111-8111-111111111111/reenvio.pdf');
 set local role authenticated;
+do $$ declare respuesta jsonb; begin
+ if (select puntaje_aprobatorio from public.evaluaciones where id='f1111111-1111-4111-8111-111111111111') <> 10.5 then raise exception 'El mínimo inicial no corresponde a la escala'; end if;
+ if (select puntaje_aprobatorio from public.evaluaciones where id='f2222222-2222-4222-8222-222222222222') <> 52.5 then raise exception 'El mínimo no se adaptó a la escala de cien'; end if;
+ respuesta:=public.configurar_puntaje_aprobatorio('f1111111-1111-4111-8111-111111111111',20.001);
+ if (respuesta->>'ok')::boolean then raise exception 'Se aceptó un mínimo de tres decimales o superior al máximo'; end if;
+ respuesta:=public.configurar_puntaje_aprobatorio('f1111111-1111-4111-8111-111111111111',12.5);
+ if not (respuesta->>'ok')::boolean or (select puntaje_aprobatorio from public.evaluaciones where id='f1111111-1111-4111-8111-111111111111') <> 12.5 then raise exception 'No se guardó el mínimo'; end if;
+end $$;
 select public.guardar_rubrica('f1111111-1111-4111-8111-111111111111','[{"numero_pregunta":1,"puntaje_maximo":20,"respuesta_esperada":"A"}]');
 select set_config('request.jwt.claim.sub','22222222-2222-4222-8222-222222222222',true);
 do $$ begin
   begin
     perform public.configurar_modalidad_recepcion('f1111111-1111-4111-8111-111111111111','manual',null);
     raise exception 'Se permitió modificar la evaluación de otro docente';
+  exception when insufficient_privilege then null; end;
+  begin
+    perform public.configurar_puntaje_aprobatorio('f1111111-1111-4111-8111-111111111111', 5);
+    raise exception 'Se permitió cambiar el mínimo de otro docente';
   exception when insufficient_privilege then null; end;
 end $$;
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);

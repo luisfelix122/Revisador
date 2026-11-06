@@ -228,3 +228,59 @@ def test_analiza_solucion_solo_al_terminar_carga_manual(monkeypatch):
         proveedor.assert_awaited_once()
     finally:
         aplicacion.dependency_overrides.pop(obtener_repositorio, None)
+
+
+def test_preparacion_cuenta_todas_las_paginas_del_pdf_seleccionado(monkeypatch):
+    from io import BytesIO
+    from uuid import uuid4
+    from unittest.mock import AsyncMock
+    from pypdf import PdfWriter
+    from presentacion.seguridad import obtener_repositorio
+    from infraestructura.tarifas_ia import ServicioTarifasOficiales
+    escritor=PdfWriter()
+    for _ in range(3): escritor.add_blank_page(width=200,height=200)
+    contenido=BytesIO(); escritor.write(contenido)
+    identificador, examen = str(uuid4()), str(uuid4())
+    evaluacion={'id':identificador,'puntaje_total_maximo':20,'indicaciones_profesor':'','soluciones_profesor':[{'ruta_almacenamiento':'solucion','cantidad_paginas':1}],'materiales_apoyo':[],'criterios_preguntas':[{'numero_pregunta':1}],'examenes_estudiantes':[{'id':examen,'estado_revision':'pendiente','ruta_imagen_examen':'estudiantes/e/examen.pdf'}]}
+    repositorio=type('RepositorioPrueba',(),{'evaluacion':AsyncMock(return_value=evaluacion),'solicitar':AsyncMock(return_value=contenido.getvalue())})()
+    monkeypatch.setattr(ServicioTarifasOficiales,'obtener_tarifa',AsyncMock(return_value={'tarifa_entrada':'1','tarifa_salida':'2','fuente':'prueba'}))
+    aplicacion.dependency_overrides[obtener_repositorio]=lambda: repositorio
+    try:
+        respuesta=TestClient(aplicacion).post(f'/api/evaluaciones/{identificador}/preparar',json={'proveedor':'openai','modelo':'gpt-4o'})
+        assert respuesta.status_code==200
+        assert respuesta.json()['paginas_examenes']==3
+        assert respuesta.json()['costo_usd']=='0.011'
+    finally:
+        aplicacion.dependency_overrides.pop(obtener_repositorio,None)
+
+
+def test_no_permita_minimo_de_aprobacion_superior_al_maximo():
+    from uuid import uuid4
+    from unittest.mock import AsyncMock
+    from presentacion.seguridad import obtener_repositorio
+    repo = type('RepositorioPrueba', (), {'solicitar': AsyncMock(return_value=[{'id':str(uuid4())}])})()
+    aplicacion.dependency_overrides[obtener_repositorio] = lambda: repo
+    try:
+        respuesta = TestClient(aplicacion).post('/api/evaluaciones', json={'curso_id':str(uuid4()),'titulo':'Práctica','puntaje_total_maximo':20,'puntaje_aprobatorio':21})
+        assert respuesta.status_code == 422
+    finally:
+        aplicacion.dependency_overrides.pop(obtener_repositorio, None)
+
+
+def test_no_inventa_costo_si_no_se_pueden_contar_paginas_del_pdf(monkeypatch):
+    from uuid import uuid4
+    from unittest.mock import AsyncMock
+    from presentacion.seguridad import obtener_repositorio
+    from infraestructura.tarifas_ia import ServicioTarifasOficiales
+    identificador = str(uuid4())
+    evaluacion={'id':identificador,'puntaje_total_maximo':20,'indicaciones_profesor':'','soluciones_profesor':[{'ruta_almacenamiento':'solucion'}],'materiales_apoyo':[],'criterios_preguntas':[{'numero_pregunta':1}],'examenes_estudiantes':[{'id':str(uuid4()),'estado_revision':'pendiente','ruta_imagen_examen':'estudiantes/e/examen.pdf'}]}
+    repositorio=type('RepositorioPrueba',(),{'evaluacion':AsyncMock(return_value=evaluacion),'solicitar':AsyncMock(side_effect=OSError('no disponible'))})()
+    monkeypatch.setattr(ServicioTarifasOficiales,'obtener_tarifa',AsyncMock(return_value={'tarifa_entrada':'1','tarifa_salida':'2','fuente':'prueba'}))
+    aplicacion.dependency_overrides[obtener_repositorio]=lambda: repositorio
+    try:
+        respuesta=TestClient(aplicacion).post(f'/api/evaluaciones/{identificador}/preparar',json={'proveedor':'openai','modelo':'gpt-4o'})
+        assert respuesta.status_code==200
+        assert respuesta.json()['costo_usd'] is None
+        assert respuesta.json()['paginas_examenes'] is None
+    finally:
+        aplicacion.dependency_overrides.pop(obtener_repositorio,None)

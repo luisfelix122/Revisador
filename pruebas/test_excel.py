@@ -28,3 +28,9 @@ def test_excel_aprueba_desde_diez_punto_cinco():
     examen = ExamenEstudiante("Ana", "01", (DetallePregunta(1, Decimal("10.5"), Decimal("20"), "Respuesta", "Correcta"),), "")
     hoja = load_workbook(BytesIO(GeneradorExcel().generar({}, (examen,))))["Acta_de_Notas"]
     assert hoja["E13"].value == '=COUNTIF(E8:E8,">=10.5")'
+
+
+def test_excel_utiliza_el_minimo_aprobatorio_de_la_evaluacion():
+    examen = ExamenEstudiante('Ana','01',(DetallePregunta(1,Decimal('52'),Decimal('100'),'Respuesta','Correcta'),),'')
+    hoja = load_workbook(BytesIO(GeneradorExcel().generar({'puntaje_aprobatorio':'60'},(examen,))))['Acta_de_Notas']
+    assert hoja['E13'].value == '=COUNTIF(E8:E8,">=60")'

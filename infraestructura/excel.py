@@ -1,6 +1,7 @@
 from datetime import datetime
 from io import BytesIO
 from zoneinfo import ZoneInfo
+from decimal import Decimal, InvalidOperation
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -48,7 +49,12 @@ class GeneradorExcel:
         columna_nota = get_column_letter(indice_nota)
         if examenes:
             rango = f"{columna_nota}8:{columna_nota}{len(examenes) + 7}"
-            for desplazamiento, (titulo, formula) in enumerate([("Promedio del Grupo", f"AVERAGE({rango})"), ("Nota Más Alta", f"MAX({rango})"), ("Nota Más Baja", f"MIN({rango})"), ("Aprobados", f'COUNTIF({rango},">=10.5")')]):
+            try:
+                minimo = Decimal(str(contexto.get('puntaje_aprobatorio', '10.5')))
+                if not minimo.is_finite() or not 0 <= minimo <= 100: raise ValueError('Mínimo aprobatorio inválido')
+            except InvalidOperation:
+                raise ValueError('Mínimo aprobatorio inválido') from None
+            for desplazamiento, (titulo, formula) in enumerate([("Promedio del Grupo", f"AVERAGE({rango})"), ("Nota Más Alta", f"MAX({rango})"), ("Nota Más Baja", f"MIN({rango})"), ("Aprobados", f'COUNTIF({rango},">={minimo}")')]):
                 fila = len(examenes) + 9 + desplazamiento
                 hoja.cell(fila, 3, titulo)
                 hoja.cell(fila, indice_nota, f"={formula}").number_format = "0.00"

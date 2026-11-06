@@ -91,6 +91,9 @@ export class ServicioBiblioteca {
       method: "PUT", body: JSON.stringify({ modalidad, finalizada: finalizada ?? null }),
     });
   }
+  configurarPuntajeAprobatorio(evaluacionId: string, puntaje: number) {
+    return this.datos(`/evaluaciones/${evaluacionId}/puntaje-aprobatorio`, { method: "PUT", body: JSON.stringify({ puntaje }) });
+  }
   permitirReenvioAlumno(evaluacionId: string, examenId: string, permitir: boolean) {
     return this.datos(`/evaluaciones/${evaluacionId}/examenes/${examenId}/permitir-reenvio`, {
       method: "PUT",
@@ -160,6 +163,7 @@ export interface EvaluacionDetalle {
   titulo: string;
   indicaciones_profesor: string;
   puntaje_total_maximo: number;
+  puntaje_aprobatorio?: number;
   estado: string;
   modalidad_recepcion?: "alumnos" | "manual";
   recepcion_iniciada?: boolean;

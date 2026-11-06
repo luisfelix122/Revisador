@@ -3,7 +3,7 @@ from typing import Literal
 from decimal import Decimal
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from infraestructura.supabase import RepositorioSupabase
 from presentacion.seguridad import obtener_repositorio
 
@@ -76,21 +76,30 @@ class NuevaEvaluacion(BaseModel):
     titulo: str = Field(min_length=1, max_length=255)
     indicaciones_profesor: str = Field(default='', max_length=10000)
     puntaje_total_maximo: float = Field(default=20, gt=0, le=100, allow_inf_nan=False)
+    puntaje_aprobatorio: float | None = Field(default=None, ge=0, le=100, allow_inf_nan=False)
 
-    @field_validator('puntaje_total_maximo')
+    @field_validator('puntaje_total_maximo', 'puntaje_aprobatorio')
     @classmethod
-    def validar_decimales(cls, puntaje: float) -> float:
+    def validar_decimales(cls, puntaje: float | None) -> float | None:
+        if puntaje is None:
+            return None
         valor = Decimal(str(puntaje))
         if valor != valor.quantize(Decimal('0.01')):
             raise ValueError('Usa como máximo dos decimales en el puntaje')
         return puntaje
+
+    @model_validator(mode='after')
+    def validar_aprobacion(self):
+        if self.puntaje_aprobatorio is not None and self.puntaje_aprobatorio > self.puntaje_total_maximo:
+            raise ValueError('El mínimo no puede superar el puntaje máximo')
+        return self
 
 
 @enrutador.post('/evaluaciones')
 async def crear_evaluacion(peticion: NuevaEvaluacion, repositorio: Repositorio):
     if not peticion.titulo.strip():
         raise HTTPException(422, 'Escribe el título de la evaluación.')
-    filas = await repositorio.solicitar('POST', '/rest/v1/evaluaciones', datos=peticion.model_dump(mode='json'))
+    filas = await repositorio.solicitar('POST', '/rest/v1/evaluaciones', datos=peticion.model_dump(mode='json', exclude_none=True))
     return filas[0]
 
 

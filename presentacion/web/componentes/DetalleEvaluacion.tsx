@@ -33,6 +33,7 @@ interface Preparacion {
   tarifa_salida?: string;
   fuente_tarifas?: string;
   advertencia?: string;
+  paginas_examenes?: number | null;
 }
 interface Propiedades {
   identificador: string;
@@ -67,10 +68,14 @@ export function DetalleEvaluacion({
     [consentimientoAnalisis, consentirAnalisis] = usarEstado(false),
     [busqueda, buscar] = usarEstado(""),
     [filtro, filtrar] = usarEstado("todos"),
+    [minimoEditable, cambiarMinimoEditable] = usarEstado(""),
     [paso, cambiarPaso] = usarEstado<1 | 2 | 3>(1),
     [revisando, revisar] = usarEstado<Examen | null>(null);
   const modoEntrega = evaluacion?.modalidad_recepcion ?? "alumnos";
   const manualFinalizada = evaluacion?.carga_manual_finalizada ?? false;
+  usarEfecto(() => {
+    if (evaluacion) cambiarMinimoEditable(String(evaluacion.puntaje_aprobatorio ?? Math.round(Number(evaluacion.puntaje_total_maximo) * 52.5) / 100));
+  }, [evaluacion?.puntaje_aprobatorio, evaluacion?.puntaje_total_maximo]);
   const detener = usarReferencia(false);
   const pasoInicializado = usarReferencia(false);
   const examenesPreparados = usarReferencia<Examen[] | null>(null);
@@ -402,14 +407,15 @@ export function DetalleEvaluacion({
       (suma, p) => suma + Number(p.puntaje_maximo),
       0,
     ),
+    minimoAprobatorio = Number(evaluacion.puntaje_aprobatorio ?? Math.round(Number(evaluacion.puntaje_total_maximo) * 52.5) / 100),
     resultados = completados.filter(
       (e) =>
         (e.nombre_estudiante + " " + e.codigo_estudiante)
           .toLocaleLowerCase("es")
           .includes(busqueda.toLocaleLowerCase("es")) &&
         (filtro === "todos" ||
-          (filtro === "aprobados" && e.nota_final >= 10.5) ||
-          (filtro === "desaprobados" && e.nota_final < 10.5) ||
+          (filtro === "aprobados" && e.nota_final >= minimoAprobatorio) ||
+          (filtro === "desaprobados" && e.nota_final < minimoAprobatorio) ||
           (filtro === "nada" && e.nombre_estudiante === "nada")),
     );
   const cursoObj = evaluacion.cursos;
@@ -456,6 +462,19 @@ export function DetalleEvaluacion({
           {evaluacion.estado === "borrador" ? "En preparación" : "Calificada"}
         </span>
       </div>
+      <form className="ajuste-aprobacion" onSubmit={(evento) => {
+        evento.preventDefault();
+        if (!minimoEditable.trim()) { mostrarError("Escribe el puntaje mínimo para aprobar."); return; }
+        const valor = Number(minimoEditable);
+        if (!Number.isFinite(valor) || valor < 0 || valor > Number(evaluacion.puntaje_total_maximo)) { mostrarError("El mínimo debe estar entre cero y el puntaje máximo."); return; }
+        ocupar(true); mostrarError("");
+        void servicio.configurarPuntajeAprobatorio(identificador, valor).then(async () => {
+          await cargar(); avisar("Puntaje mínimo actualizado.");
+        }).catch((problema) => mostrarError(mensaje(problema))).finally(() => ocupar(false));
+      }}>
+        <label>Puntaje mínimo para aprobar<input type="number" min="0" max={evaluacion.puntaje_total_maximo} step="0.01" value={minimoEditable} onChange={(evento) => cambiarMinimoEditable(evento.target.value)} /></label>
+        <button type="submit" className="boton-contorno" disabled={ocupado || corriendo || minimoEditable.trim() === "" || Number(minimoEditable) === minimoAprobatorio}>Guardar mínimo</button>
+      </form>
       {error && (
         <p className="error" role="alert">
           {error}
@@ -771,6 +790,7 @@ export function DetalleEvaluacion({
         {estimacion && (
           <div className="resultado-costo">
             <strong>Resumen del lote · {estimacion.examenes} {estimacion.examenes === 1 ? "examen" : "exámenes"}</strong>
+            {estimacion.paginas_examenes != null && <p>Páginas de exámenes: {estimacion.paginas_examenes}</p>}
             {configuracionEstimada.current && <p>Modelo: {configuracionEstimada.current.modelo}</p>}
             {estimacion.costo_usd && (
               <p style={{ margin: "6px 0", color: "#137333", fontWeight: 600 }}>
@@ -782,7 +802,7 @@ export function DetalleEvaluacion({
                 )}
               </p>
             )}
-            {!estimacion.costo_usd && <p>No hay una estimación automática disponible para esta selección. Consulta las tarifas del proveedor antes de continuar.</p>}
+            {!estimacion.costo_usd && <p>{estimacion.advertencia || "No hay una estimación automática disponible para esta selección. Consulta las tarifas del proveedor antes de continuar."}</p>}
             <p>Se enviarán la solución, los materiales, las indicaciones y los exámenes al proveedor seleccionado. El cálculo usa una cantidad estimada de tokens; el costo real puede variar según el contenido, las páginas y las tarifas vigentes.</p>
             <label className="casilla">
               <input type="checkbox" checked={consentimiento} onChange={(evento) => consentir(evento.target.checked)} />
@@ -870,10 +890,10 @@ export function DetalleEvaluacion({
                 </dd>
               </div>
               <div>
-                <dt>Aprobados (≥10,5)</dt>
+                <dt>Aprobados (≥{minimoAprobatorio.toLocaleString("es-PE")})</dt>
                 <dd>
                   {Math.round(
-                    (completados.filter((e) => e.nota_final >= 10.5).length /
+                    (completados.filter((e) => e.nota_final >= minimoAprobatorio).length /
                       completados.length) *
                       100,
                   )}
@@ -931,7 +951,7 @@ export function DetalleEvaluacion({
                       <td>{examen.codigo_estudiante}</td>
                       <td
                         className={
-                          examen.nota_final >= 10.5
+                          examen.nota_final >= minimoAprobatorio
                             ? "nota-aprobada"
                             : "nota-desaprobada"
                         }

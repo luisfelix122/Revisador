@@ -12,11 +12,14 @@ class SolicitudCosto:
     tokens_retroalimentacion: int
     tarifa_entrada: Decimal
     tarifa_salida: Decimal
+    paginas_examenes: int | None = None
 
     def __post_init__(self):
         cantidades = (self.cantidad_examenes, self.tokens_solucion, self.tokens_materiales, self.tokens_indicaciones, self.tokens_imagen, self.tokens_retroalimentacion)
         if any(cantidad < 0 for cantidad in cantidades):
             raise ValueError("Las cantidades no pueden ser negativas")
+        if self.paginas_examenes is not None and self.paginas_examenes < self.cantidad_examenes:
+            raise ValueError("Cada examen debe tener al menos una página")
         for tarifa in (self.tarifa_entrada, self.tarifa_salida):
             if not tarifa.is_finite() or tarifa < 0:
                 raise ValueError("La tarifa debe ser finita y no negativa")
@@ -31,8 +34,9 @@ class EstimacionCosto:
 
 class CalcularCostoEstimado:
     def ejecutar(self, solicitud: SolicitudCosto) -> EstimacionCosto:
-        contexto = solicitud.tokens_solucion + solicitud.tokens_materiales + solicitud.tokens_indicaciones + solicitud.tokens_imagen
-        entrada = contexto * solicitud.cantidad_examenes
+        contexto = solicitud.tokens_solucion + solicitud.tokens_materiales + solicitud.tokens_indicaciones
+        paginas = solicitud.paginas_examenes if solicitud.paginas_examenes is not None else solicitud.cantidad_examenes
+        entrada = contexto * solicitud.cantidad_examenes + solicitud.tokens_imagen * paginas
         salida = solicitud.tokens_retroalimentacion * solicitud.cantidad_examenes
         costo = (entrada * solicitud.tarifa_entrada + salida * solicitud.tarifa_salida) / Decimal("1000000")
         return EstimacionCosto(entrada, salida, costo)

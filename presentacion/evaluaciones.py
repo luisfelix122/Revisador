@@ -10,7 +10,7 @@ from urllib.parse import quote
 from pathlib import PurePath
 from fastapi import APIRouter, File, UploadFile, HTTPException, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from presentacion.biblioteca import Repositorio
 from presentacion.esquemas import ConfiguracionIA
 from aplicacion.dto_ia import SalidaRubrica, SalidaCalificacion
@@ -102,15 +102,22 @@ async def preparar(identificador: UUID, repositorio: Repositorio, peticion: Mode
         disponibles = {str(examen['id']) for examen in examenes}
         if not seleccion.issubset(disponibles):
             raise HTTPException(422, 'Los exámenes seleccionados no pertenecen a esta evaluación.')
-        cantidad = len(seleccion)
+        seleccionados = [examen for examen in examenes if str(examen['id']) in seleccion]
     else:
-        cantidad = sum(examen['estado_revision'] != 'completado' for examen in examenes)
-        if not cantidad:
-            cantidad = len(examenes)
+        seleccionados = [examen for examen in examenes if examen['estado_revision'] != 'completado'] or examenes
+    cantidad = len(seleccionados)
     paginas = sum(archivo.get('cantidad_paginas', 1) for archivo in evaluacion.get('soluciones_profesor', []) + evaluacion.get('materiales_apoyo', []))
     costo_usd = None
     fuente_tarifas = None
+    paginas_examenes = None
+    advertencia = None
     try:
+        paginas_examenes = await DocumentosPrivados(repositorio).contar_paginas_examenes(seleccionados)
+    except Exception:
+        advertencia = 'No se pudieron contar las páginas de uno o más exámenes. Vuelve a preparar el lote.'
+    try:
+        if paginas_examenes is None:
+            raise ValueError('No se pudieron contar las páginas')
         if peticion is None:
             raise ValueError('Falta el modelo para calcular el costo')
         tarifas = await ServicioTarifasOficiales().obtener_tarifa(peticion.proveedor, peticion.modelo)
@@ -126,17 +133,21 @@ async def preparar(identificador: UUID, repositorio: Repositorio, peticion: Mode
                 1500,
                 tin,
                 tout,
+                paginas_examenes=paginas_examenes,
             )
         )
         costo_usd = str(res.costo_usd)
         fuente_tarifas = tarifas['fuente']
     except Exception:
-        pass
+        if advertencia is None:
+            advertencia = 'No hay una tarifa disponible para el modelo seleccionado. Consulta las tarifas del proveedor.'
     return {
         'examenes': cantidad,
         'huella': huella_evaluacion(evaluacion),
         'costo_usd': costo_usd,
         'fuente_tarifas': fuente_tarifas,
+        'paginas_examenes': paginas_examenes,
+        'advertencia': advertencia,
     }
 
 
@@ -148,7 +159,9 @@ async def estimar(identificador: UUID,peticion: PeticionEstimacion,repositorio: 
     archivos = (evaluacion.get('soluciones_profesor') or []) + (evaluacion.get('materiales_apoyo') or [])
     paginas = sum(archivo.get('cantidad_paginas', 1) for archivo in archivos)
     examenes = evaluacion.get('examenes_estudiantes') or []
-    cantidad = sum(examen.get('estado_revision') != 'completado' for examen in examenes)
+    seleccionados = [examen for examen in examenes if examen.get('estado_revision') != 'completado']
+    cantidad = len(seleccionados)
+    paginas_examenes = await DocumentosPrivados(repositorio).contar_paginas_examenes(seleccionados)
     tarifa_in = peticion.tarifa_entrada
     tarifa_out = peticion.tarifa_salida
     fuente_tarifa = "Tarifas introducidas por el docente"
@@ -158,11 +171,12 @@ async def estimar(identificador: UUID,peticion: PeticionEstimacion,repositorio: 
         tarifa_out = tarifa_out if (tarifa_out is not None and tarifa_out > 0) else Decimal(str(tarifas_oficiales["tarifa_salida"]))
         fuente_tarifa = tarifas_oficiales["fuente"]
 
-    resultado = CalcularCostoEstimado().ejecutar(SolicitudCosto(cantidad,paginas*2000,0,len(evaluacion.get('indicaciones_profesor') or '')//3,2000,1500,tarifa_in,tarifa_out))
+    resultado = CalcularCostoEstimado().ejecutar(SolicitudCosto(cantidad,paginas*2000,0,len(evaluacion.get('indicaciones_profesor') or '')//3,2000,1500,tarifa_in,tarifa_out,paginas_examenes=paginas_examenes))
     return {
         'costo_usd':str(resultado.costo_usd),
         'examenes':cantidad,
         'paginas':paginas,
+        'paginas_examenes':paginas_examenes,
         'huella':huella_evaluacion(evaluacion),
         'modelo':peticion.modelo,
         'tarifa_entrada': str(tarifa_in),
@@ -217,6 +231,25 @@ class PeticionEstadoRecepcion(BaseModel):
 
 class PeticionPermitirReenvio(BaseModel):
     permitir: bool
+
+
+class PeticionPuntajeAprobatorio(BaseModel):
+    puntaje: Decimal = Field(ge=0, le=100, allow_inf_nan=False)
+
+    @field_validator('puntaje')
+    @classmethod
+    def validar_precision(cls, valor: Decimal) -> Decimal:
+        if valor != valor.quantize(Decimal('0.01')):
+            raise ValueError('Usa como máximo dos decimales')
+        return valor
+
+
+@enrutador.put('/{identificador}/puntaje-aprobatorio')
+async def configurar_puntaje_aprobatorio(identificador: UUID, peticion: PeticionPuntajeAprobatorio, repositorio: Repositorio):
+    resultado = await repositorio.rpc('configurar_puntaje_aprobatorio', {'p_evaluacion': str(identificador), 'p_puntaje': str(peticion.puntaje)})
+    if not resultado.get('ok'):
+        raise HTTPException(422, resultado.get('detalle', 'No se pudo actualizar el mínimo aprobatorio.'))
+    return resultado
 
 
 class PeticionModalidadRecepcion(BaseModel):
@@ -303,7 +336,7 @@ async def reporte(identificador: UUID,repositorio: Repositorio):
     campos = ('numero_pregunta','puntaje_obtenido','puntaje_maximo','respuesta_detectada','justificacion')
     examenes = [validar_resultado({**{clave:examen[clave] for clave in ('nombre_estudiante','codigo_estudiante','observaciones_generales')},'preguntas':[{clave:pregunta[clave] for clave in campos} for pregunta in examen['detalles_preguntas']]},evaluacion['criterios_preguntas']) for examen in evaluacion['examenes_estudiantes'] if examen['estado_revision']=='completado']
     curso=evaluacion['cursos']; ciclo=curso['promociones_ciclos']; escuela=ciclo['escuelas']; facultad=escuela['facultades']
-    contexto={'curso':curso['nombre'],'evaluacion':evaluacion['titulo'],'ciclo':ciclo['denominacion'],'escuela':escuela['nombre'],'facultad':facultad['nombre'],'anio':str(facultad['anios_academicos']['anio'])}
+    contexto={'curso':curso['nombre'],'evaluacion':evaluacion['titulo'],'ciclo':ciclo['denominacion'],'escuela':escuela['nombre'],'facultad':facultad['nombre'],'anio':str(facultad['anios_academicos']['anio']), 'puntaje_aprobatorio': str(evaluacion.get('puntaje_aprobatorio', 10.5))}
     revisiones = tuple(bool(examen.get('revisado_por_profesor')) for examen in evaluacion['examenes_estudiantes'] if examen['estado_revision']=='completado')
     contenido=await asyncio.to_thread(GeneradorExcel().generar,contexto,tuple(examenes),revisiones)
     return StreamingResponse(BytesIO(contenido),media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',headers={'Content-Disposition':f'attachment; filename="Acta_{identificador}.xlsx"','Cache-Control':'no-store'})

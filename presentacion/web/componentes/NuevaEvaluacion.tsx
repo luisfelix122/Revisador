@@ -21,6 +21,7 @@ export function NuevaEvaluacion({
     [titulo, cambiarTitulo] = usarEstado(""),
     [indicaciones, cambiarIndicaciones] = usarEstado(""),
     [maximo, cambiarMaximo] = usarEstado("20"),
+    [minimo, cambiarMinimo] = usarEstado(""),
     [ocupado, ocupar] = usarEstado(false),
     [error, mostrarError] = usarEstado("");
   const crear = async (evento: React.FormEvent) => {
@@ -33,6 +34,7 @@ export function NuevaEvaluacion({
         titulo,
         indicaciones_profesor: indicaciones,
         puntaje_total_maximo: Number(maximo),
+        ...(minimo.trim() ? { puntaje_aprobatorio: Number(minimo) } : {}),
       });
       alCrear(resultado.id);
     } catch (problema) {
@@ -101,6 +103,11 @@ export function NuevaEvaluacion({
             value={maximo}
             onChange={(evento) => cambiarMaximo(evento.target.value)}
           />
+        </label>
+        <label>
+          Puntaje mínimo para aprobar
+          <input type="number" min="0" max={maximo || "100"} step="0.01" value={minimo} onChange={(evento) => cambiarMinimo(evento.target.value)} placeholder={String(Math.round(Number(maximo || 20) * 52.5) / 100)} />
+          <span className="ayuda-campo">Si lo dejas vacío, se usará el equivalente a 10,5 sobre 20.</span>
         </label>
         <label>
           Indicaciones para la corrección

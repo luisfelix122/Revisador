@@ -16,3 +16,10 @@ def test_debe_repetir_contexto_por_alumno_y_aplicar_tarifas_por_millon():
 def test_debe_rechazar_cantidades_y_tarifas_invalidas(cantidad, tarifa):
     with pytest.raises(ValueError):
         SolicitudCosto(cantidad, 1, 0, 0, 1, 1, Decimal(tarifa), Decimal("1"))
+
+
+def test_estima_costo_según_el_total_de_páginas_de_los_exámenes():
+    solicitud = SolicitudCosto(2, 1000, 0, 0, 2000, 300, Decimal('1'), Decimal('2'), paginas_examenes=5)
+    resultado = CalcularCostoEstimado().ejecutar(solicitud)
+    assert resultado.tokens_entrada == 12000
+    assert resultado.costo_usd == Decimal('0.0132')

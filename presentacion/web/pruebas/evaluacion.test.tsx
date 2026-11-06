@@ -218,3 +218,26 @@ prueba("recuerda la confirmación manual al volver a abrir una evaluación", asy
   disparar.click(pantalla.getByRole('checkbox',{name:/Autorizo una llamada de IA/}));
   esperar(pantalla.getByRole('button',{name:'Analizar solución con IA'})).toBeEnabled();
 });
+
+prueba("clasifica resultados con el mínimo de aprobación propio de la evaluación", async () => {
+  const examen=(id:string,nota:number)=>({id,nombre_estudiante:id,codigo_estudiante:id,nota_final:nota,estado_revision:'completado',observaciones_generales:'',detalles_preguntas:[]});
+  const servicio={evaluacion:async()=>({id:'pc',titulo:'PC',cursos:{nombre:'Curso'},puntaje_total_maximo:100,puntaje_aprobatorio:60,criterios_preguntas:[],soluciones_profesor:[],materiales_apoyo:[],examenes_estudiantes:[examen('Ana',55),examen('Luis',60)]})} as unknown as ServicioBiblioteca;
+  representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={false} alVolver={()=>{}} />);
+  await pantalla.findByRole('heading',{name:'PC'});
+  disparar.change(pantalla.getByLabelText('Filtrar resultados'),{target:{value:'aprobados'}});
+  const resultados=pantalla.getByRole('heading',{name:'Resultados y revisión docente'}).closest('section')!;
+  esperar(dentroDe(resultados).queryByText('Ana')).not.toBeInTheDocument();
+  esperar(dentroDe(resultados).getAllByText('Luis').length).toBeGreaterThan(0);
+});
+
+prueba("el docente puede cambiar el mínimo de aprobación guardado", async () => {
+  const datos={id:'pc',titulo:'PC',cursos:{nombre:'Curso'},puntaje_total_maximo:100,puntaje_aprobatorio:52.5,criterios_preguntas:[],soluciones_profesor:[],materiales_apoyo:[],examenes_estudiantes:[]};
+  const configurar=simular.fn(async (_id:string, puntaje:number)=>{datos.puntaje_aprobatorio=puntaje});
+  const servicio={evaluacion:async()=>({...datos}),configurarPuntajeAprobatorio:configurar} as unknown as ServicioBiblioteca;
+  representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={false} alVolver={()=>{}} />);
+  await pantalla.findByRole('heading',{name:'PC'});
+  disparar.change(pantalla.getByLabelText('Puntaje mínimo para aprobar'),{target:{value:'60'}});
+  disparar.click(pantalla.getByRole('button',{name:'Guardar mínimo'}));
+  await esperarQue(()=>esperar(configurar).toHaveBeenCalledWith('pc',60));
+  esperar(await pantalla.findByText('Puntaje mínimo actualizado.')).toBeInTheDocument();
+});
