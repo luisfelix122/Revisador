@@ -16,6 +16,8 @@ import {
   SlidersHorizontal as Filtros,
   FileText as Archivo,
   X as Cerrar,
+  Pencil as Editar,
+  Trash2 as Eliminar,
 } from "lucide-react";
 import {
   useState as usarEstado,
@@ -43,6 +45,9 @@ interface Propiedades {
   contenido?: Contenido;
   alOrganizar?: () => void;
   alEliminarNodo?: (tipo: NonNullable<NodoAcademico['tipo']>, id: string, nombre: string) => void;
+  alRenombrarNodo?: (tipo: NonNullable<NodoAcademico['tipo']>, id: string, nombre: string) => void;
+  alRenombrarEvaluacion?: (id: string, nombre: string) => void;
+  alEliminarEvaluacion?: (id: string, nombre: string) => void;
   alCerrarSesion?: () => void;
   alVerificarIA?: (verificada: boolean) => void;
   alVolverBiblioteca?: () => void;
@@ -59,6 +64,9 @@ export function Aplicacion({
   contenido,
   alOrganizar,
   alEliminarNodo,
+  alRenombrarNodo,
+  alRenombrarEvaluacion,
+  alEliminarEvaluacion,
   alCerrarSesion,
   alVerificarIA,
   alVolverBiblioteca,
@@ -261,6 +269,7 @@ export function Aplicacion({
               alRegresar={alRegresar}
               alOrganizar={alOrganizar}
               alEliminar={alEliminarNodo}
+              alRenombrar={alRenombrarNodo}
             />
             <div className="pie-lateral">
               <button
@@ -356,18 +365,17 @@ export function Aplicacion({
             {ordenadas.length ? (
               <div className={`evaluaciones ${vista}`}>
                 {ordenadas.map((evaluacion) => (
-                  <button
+                  <article
                     className="tarjeta-evaluacion"
                     key={evaluacion.id}
-                    onClick={() => alAbrirEvaluacion?.(evaluacion.id)}
-                    disabled={!alAbrirEvaluacion}
                   >
+                    <button className="abrir-evaluacion" onClick={() => alAbrirEvaluacion?.(evaluacion.id)} disabled={!alAbrirEvaluacion || evaluacion.eliminando}>
                     <div className="portada-evaluacion">
                       <Archivo size={35} />
                     </div>
                     <div className="datos-evaluacion">
                       <span className="estado-evaluacion">
-                        {evaluacion.estado === "borrador"
+                        {evaluacion.eliminando ? "Eliminación pendiente" : evaluacion.estado === "borrador"
                           ? "Borrador"
                           : "Calificada"}
                       </span>
@@ -390,7 +398,13 @@ export function Aplicacion({
                         <p>Promedio: {evaluacion.promedio.toFixed(2)}</p>
                       )}
                     </div>
-                  </button>
+                    </button>
+                    <div className="acciones-evaluacion">
+                      {!evaluacion.eliminando && alRenombrarEvaluacion && <button type="button" className="boton-icono pequeno" aria-label={`Renombrar ${evaluacion.titulo}`} title="Renombrar" onClick={() => alRenombrarEvaluacion(evaluacion.id, evaluacion.titulo)}><Editar size={16} /></button>}
+                      {alEliminarEvaluacion && <button type="button" className="boton-icono pequeno accion-eliminar" aria-label={`Eliminar ${evaluacion.titulo}`} title={evaluacion.eliminando ? "Reintentar eliminación" : "Eliminar"} onClick={() => alEliminarEvaluacion(evaluacion.id, evaluacion.titulo)}><Eliminar size={16} /></button>}
+                      {evaluacion.eliminando && <span>Reintenta la eliminación</span>}
+                    </div>
+                  </article>
                 ))}
               </div>
             ) : (

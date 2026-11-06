@@ -6,6 +6,7 @@ import {
   ArrowLeft as Regresar,
   Plus as Agregar,
   Trash2 as Eliminar,
+  Pencil as Editar,
 } from "lucide-react";
 import type { NodoAcademico } from "../tipos";
 
@@ -16,6 +17,7 @@ interface Propiedades {
   alRegresar?: () => void;
   alOrganizar?: () => void;
   alEliminar?: (tipo: NonNullable<NodoAcademico['tipo']>, id: string, nombre: string) => void;
+  alRenombrar?: (tipo: NonNullable<NodoAcademico['tipo']>, id: string, nombre: string) => void;
 }
 
 function Rama({
@@ -23,11 +25,13 @@ function Rama({
   activo,
   alSeleccionar,
   alEliminar,
+  alRenombrar,
 }: {
   nodo: NodoAcademico;
   activo?: string;
   alSeleccionar?: (id: string) => void;
   alEliminar?: Propiedades['alEliminar'];
+  alRenombrar?: Propiedades['alRenombrar'];
 }) {
   const [abierto, abrir] = usarEstado(false);
   return (
@@ -52,7 +56,8 @@ function Rama({
           {nodo.hijos ? <Carpeta size={17} /> : <Libro size={17} />}
           <span>{nodo.nombre}</span>
         </button>
-        {nodo.tipo && alEliminar && <button type="button" className="boton-icono pequeno" aria-label={`Eliminar ${nodo.nombre}`} title="Eliminar si está vacío" onClick={() => alEliminar(nodo.tipo!, nodo.id, nodo.nombre)}><Eliminar size={15} /></button>}
+        {nodo.tipo && alRenombrar && <button type="button" className="boton-icono pequeno" aria-label={`Renombrar ${nodo.nombre}`} title="Renombrar" onClick={() => alRenombrar(nodo.tipo!, nodo.id, nodo.nombre)}><Editar size={15} /></button>}
+        {nodo.tipo && alEliminar && <button type="button" className="boton-icono pequeno accion-eliminar" aria-label={`Eliminar ${nodo.nombre}`} title="Eliminar si está vacío" onClick={() => alEliminar(nodo.tipo!, nodo.id, nodo.nombre)}><Eliminar size={15} /></button>}
       </div>
       {abierto && nodo.hijos && (
         <ul className="ramas-hijas">
@@ -63,6 +68,7 @@ function Rama({
               activo={activo}
               alSeleccionar={alSeleccionar}
               alEliminar={alEliminar}
+              alRenombrar={alRenombrar}
             />
           ))}
         </ul>
@@ -78,6 +84,7 @@ export function Explorador({
   alRegresar,
   alOrganizar,
   alEliminar,
+  alRenombrar,
 }: Propiedades) {
   return (
     <section className="explorador" aria-label="Explorador académico">
@@ -114,6 +121,7 @@ export function Explorador({
               activo={activo}
               alSeleccionar={alSeleccionar}
               alEliminar={alEliminar}
+              alRenombrar={alRenombrar}
             />
           ))}
         </ul>

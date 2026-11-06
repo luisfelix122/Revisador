@@ -338,7 +338,8 @@ p {
   background: #dce8fa;
 }
 .rama > .boton-icono { flex: 0 0 30px; color: #5f6368; }
-.rama > .boton-icono:hover { color: #b3261e; }
+.rama > .boton-icono:hover { color: #1a73e8; }
+.rama > .accion-eliminar:hover, .acciones-evaluacion .accion-eliminar:hover { color: #b3261e; }
 .organizar-nivel { padding: 14px 0; border-bottom: 1px solid #e8eaed; }
 .organizar-nivel form { margin-top: 12px; padding: 14px; background: #f8f9fa; border-radius: 8px; }
 .organizar-nivel form .boton-primario { margin-top: 10px; }
@@ -628,6 +629,9 @@ h1 {
 .tarjeta-evaluacion:disabled {
   opacity: 1;
 }
+.abrir-evaluacion { display: block; width: 100%; border: 0; padding: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.abrir-evaluacion:disabled { cursor: default; }
+.acciones-evaluacion { display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding: 0 10px 10px; color: #5f6368; font-size: 12px; }
 .portada-evaluacion {
   display: grid;
   place-items: center;
@@ -664,9 +668,11 @@ h1 {
 .evaluaciones.lista {
   grid-template-columns: 1fr;
 }
-.lista .tarjeta-evaluacion {
+.lista .abrir-evaluacion {
   display: flex;
 }
+.lista .tarjeta-evaluacion { display: flex; align-items: stretch; }
+.lista .acciones-evaluacion { padding: 10px; }
 .lista .portada-evaluacion {
   width: 100px;
   flex-shrink: 0;

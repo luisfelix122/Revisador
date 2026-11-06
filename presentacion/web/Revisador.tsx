@@ -142,6 +142,7 @@ export function Revisador() {
             completados.length
           : undefined,
         estado: evaluacion.estado === "borrador" ? "borrador" : "calificado",
+        eliminando: evaluacion.eliminando,
       };
     }),
   );
@@ -255,6 +256,23 @@ export function Revisador() {
         }}
         alCrearEvaluacion={() => crear(true)}
         alOrganizar={() => organizar(true)}
+        alRenombrarNodo={(nivel, id, nombre) => {
+          const nuevo = window.prompt('Escribe el nuevo nombre:', nombre)?.trim();
+          if (!nuevo || nuevo === nombre) return;
+          void servicio.renombrarNodo(nivel, id, nuevo).then(actualizar).catch((problema) => mostrarError(problema instanceof Error ? problema.message : 'No se pudo renombrar.'));
+        }}
+        alRenombrarEvaluacion={(id, nombre) => {
+          const nuevo = window.prompt('Escribe el nuevo nombre de la evaluación:', nombre)?.trim();
+          if (!nuevo || nuevo === nombre) return;
+          void servicio.renombrarEvaluacion(id, nuevo).then(actualizar).catch((problema) => mostrarError(problema instanceof Error ? problema.message : 'No se pudo renombrar.'));
+        }}
+        alEliminarEvaluacion={(id, nombre) => {
+          if (!window.confirm(`¿Eliminar «${nombre}»? Se borrarán sus archivos, entregas, historial y resultados. Esta acción no se puede deshacer.`)) return;
+          void servicio.eliminarEvaluacion(id).then(actualizar).catch(async (problema) => {
+            await actualizar();
+            mostrarError(problema instanceof Error ? `${problema.message} Si la eliminación quedó pendiente, vuelve a intentarlo.` : 'No se pudo eliminar. Vuelve a intentarlo.');
+          });
+        }}
         alEliminarNodo={(nivel, id, nombre) => {
           if (!window.confirm(`¿Eliminar «${nombre}»? Solo se puede eliminar si está vacío.`)) return;
           void servicio.eliminarNodo(nivel, id).then(async () => {

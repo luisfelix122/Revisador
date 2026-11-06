@@ -205,3 +205,15 @@ prueba(
     ).toBeInTheDocument();
   },
 );
+
+prueba("permite renombrar nodos y gestionar evaluaciones sin abrirlas", async () => {
+  const renombrarNodo = simular.fn(), renombrar = simular.fn(), eliminar = simular.fn(), abrir = simular.fn();
+  representar(<Aplicacion nodos={[{id: "curso", nombre: "Física", tipo: "cursos"}]} evaluaciones={[{id: "eval", titulo: "Práctica", curso: "Física", fecha: "2026-01-01", cantidadExamenes: 0, estado: "borrador"}]} alRenombrarNodo={renombrarNodo} alRenombrarEvaluacion={renombrar} alEliminarEvaluacion={eliminar} alAbrirEvaluacion={abrir} />);
+  await usuario.click(pantalla.getByRole("button", {name: "Renombrar Física"}));
+  await usuario.click(pantalla.getByRole("button", {name: "Renombrar Práctica"}));
+  await usuario.click(pantalla.getByRole("button", {name: "Eliminar Práctica"}));
+  esperar(renombrarNodo).toHaveBeenCalledWith("cursos", "curso", "Física");
+  esperar(renombrar).toHaveBeenCalledWith("eval", "Práctica");
+  esperar(eliminar).toHaveBeenCalledWith("eval", "Práctica");
+  esperar(abrir).not.toHaveBeenCalled();
+});

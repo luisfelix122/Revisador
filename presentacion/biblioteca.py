@@ -50,6 +50,27 @@ async def eliminar_nodo(nivel: Nivel, identificador: UUID, repositorio: Reposito
     return resultado
 
 
+class CambioNombre(BaseModel):
+    nombre: str = Field(min_length=1, max_length=255)
+
+
+@enrutador.patch('/biblioteca/{nivel}/{identificador}')
+async def renombrar_nodo(nivel: Nivel, identificador: UUID, peticion: CambioNombre, repositorio: Repositorio):
+    nombre = peticion.nombre.strip()
+    if not nombre or len(nombre) > 100:
+        raise HTTPException(422, 'Escribe un nombre de hasta 100 caracteres.')
+    if nivel == 'anios_academicos':
+        if not nombre.isdigit() or not 1900 <= int(nombre) <= 2200:
+            raise HTTPException(422, 'El año debe estar entre 1900 y 2200.')
+        datos = {'anio': int(nombre)}
+    else:
+        datos = {'denominacion' if nivel == 'promociones_ciclos' else 'nombre': nombre}
+    filas = await repositorio.solicitar('PATCH', f'/rest/v1/{nivel}?id=eq.{identificador}', datos=datos)
+    if not filas:
+        raise HTTPException(404, 'Elemento no encontrado en tu biblioteca.')
+    return filas[0]
+
+
 class NuevaEvaluacion(BaseModel):
     curso_id: UUID
     titulo: str = Field(min_length=1, max_length=255)
@@ -76,3 +97,23 @@ async def crear_evaluacion(peticion: NuevaEvaluacion, repositorio: Repositorio):
 @enrutador.get('/evaluaciones/{identificador}')
 async def ver_evaluacion(identificador: UUID, repositorio: Repositorio):
     return await repositorio.evaluacion(identificador)
+
+
+@enrutador.patch('/evaluaciones/{identificador}')
+async def renombrar_evaluacion(identificador: UUID, peticion: CambioNombre, repositorio: Repositorio):
+    nombre = peticion.nombre.strip()
+    if not nombre:
+        raise HTTPException(422, 'Escribe el título de la evaluación.')
+    return await repositorio.rpc('renombrar_evaluacion', {'p_evaluacion': str(identificador), 'p_titulo': nombre})
+
+
+@enrutador.delete('/evaluaciones/{identificador}')
+async def eliminar_evaluacion(identificador: UUID, repositorio: Repositorio):
+    repositorio.clave_recepcion()
+    resultado = await repositorio.rpc('iniciar_eliminacion_evaluacion', {'p_evaluacion': str(identificador)})
+    if not resultado.get('iniciado'):
+        raise HTTPException(409, resultado.get('detalle', 'No se pudo eliminar la evaluación.'))
+    await repositorio.borrar_archivos_recepcion(resultado.get('rutas', []))
+    return await repositorio.rpc_recepcion('finalizar_eliminacion_evaluacion', {
+        'p_evaluacion': str(identificador), 'p_propietario': str(repositorio.sesion.usuario_id),
+    })

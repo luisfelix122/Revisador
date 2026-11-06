@@ -12,6 +12,7 @@ export interface EvaluacionResumen {
   cantidadExamenes: number;
   promedio?: number;
   estado: "borrador" | "calificado";
+  eliminando?: boolean;
 }
 export interface Credenciales {
   proveedor: "openai" | "gemini";

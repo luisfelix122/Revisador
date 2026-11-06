@@ -43,6 +43,15 @@ export class ServicioBiblioteca {
   eliminarNodo(nivel: string, id: string) {
     return this.datos(`/biblioteca/${nivel}/${id}`, { method: 'DELETE' });
   }
+  renombrarNodo(nivel: string, id: string, nombre: string) {
+    return this.datos(`/biblioteca/${nivel}/${id}`, { method: "PATCH", body: JSON.stringify({ nombre }) });
+  }
+  renombrarEvaluacion(id: string, nombre: string) {
+    return this.datos(`/evaluaciones/${id}`, { method: "PATCH", body: JSON.stringify({ nombre }) });
+  }
+  eliminarEvaluacion(id: string) {
+    return this.datos(`/evaluaciones/${id}`, { method: "DELETE" });
+  }
   crearEvaluacion(datos: object) {
     return this.datos<{ id: string }>("/evaluaciones", {
       method: "POST",
@@ -164,6 +173,7 @@ export interface EvaluacionLista {
   titulo: string;
   creado_en: string;
   estado: string;
+  eliminando?: boolean;
   examenes_estudiantes: Pick<Examen, "id" | "nota_final" | "estado_revision">[];
 }
 export interface Curso {

@@ -124,11 +124,19 @@ class RepositorioSupabase:
         await cls.solicitar_publico('DELETE', '/storage/v1/object/evaluaciones',
             datos={'prefixes': [ruta]}, cabeceras=cls.cabeceras_recepcion())
 
+    @classmethod
+    async def borrar_archivos_recepcion(cls, rutas: list[str]):
+        for inicio in range(0, len(rutas), 1000):
+            await cls.solicitar_publico('DELETE', '/storage/v1/object/evaluaciones',
+                datos={'prefixes': rutas[inicio:inicio + 1000]}, cabeceras=cls.cabeceras_recepcion())
+
     async def evaluacion(self, identificador: UUID) -> dict:
         filas = await self.solicitar('GET', f'/rest/v1/evaluaciones?id=eq.{identificador}&select=*,cursos(*,promociones_ciclos(*,escuelas(*,facultades(*,anios_academicos(*))))),soluciones_profesor(*),materiales_apoyo(*),criterios_preguntas(*),examenes_estudiantes(*,detalles_preguntas(*),historial_entregas_estudiantes(*))')
         if not filas:
             raise ErrorPersistencia('Evaluación no encontrada en tu biblioteca.', 404)
         evaluacion = filas[0]
+        if evaluacion.get('eliminando'):
+            raise ErrorPersistencia('Esta evaluación tiene una eliminación pendiente. Vuelve a la biblioteca para reintentarla.', 409)
         solucion = evaluacion.get('soluciones_profesor')
         evaluacion['soluciones_profesor'] = solucion if isinstance(solucion, list) else [solucion] if solucion else []
         for relacion in ('materiales_apoyo', 'criterios_preguntas', 'examenes_estudiantes'):
