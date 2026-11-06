@@ -1,5 +1,6 @@
 """Clientes por solicitud para sesiones docentes y recepción pública."""
 import os
+from decimal import Decimal
 from dataclasses import dataclass
 from uuid import UUID
 import httpx
@@ -131,7 +132,7 @@ class RepositorioSupabase:
                 datos={'prefixes': rutas[inicio:inicio + 1000]}, cabeceras=cls.cabeceras_recepcion())
 
     async def evaluacion(self, identificador: UUID) -> dict:
-        filas = await self.solicitar('GET', f'/rest/v1/evaluaciones?id=eq.{identificador}&select=*,cursos(*,promociones_ciclos(*,escuelas(*,facultades(*,anios_academicos(*))))),soluciones_profesor(*),materiales_apoyo(*),criterios_preguntas(*),examenes_estudiantes(*,detalles_preguntas(*),historial_entregas_estudiantes(*))')
+        filas = await self.solicitar('GET', f'/rest/v1/evaluaciones?id=eq.{identificador}&select=*,cursos(*,promociones_ciclos(*,escuelas(*,facultades(*,anios_academicos(*))))),soluciones_profesor(*),materiales_apoyo(*),criterios_preguntas(*),examenes_estudiantes(*,detalles_preguntas(*,puntaje_maximo,numero_pregunta),historial_entregas_estudiantes(*))')
         if not filas:
             raise ErrorPersistencia('Evaluación no encontrada en tu biblioteca.', 404)
         evaluacion = filas[0]
@@ -147,4 +148,9 @@ class RepositorioSupabase:
                 examen.get('historial_entregas_estudiantes') or [],
                 key=lambda h: h.get('numero_entrega', 1)
             )
+            examen['nota_final'] = float(sum((Decimal(str(detalle['puntaje_obtenido'])) for detalle in examen['detalles_preguntas']), Decimal('0')))
+            if examen['historial_entregas_estudiantes']:
+                ultima = examen['historial_entregas_estudiantes'][-1]
+                examen['numero_entregas'] = ultima['numero_entrega']
+                examen['ruta_imagen_examen'] = ultima['ruta_archivo']
         return evaluacion

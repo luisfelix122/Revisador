@@ -1,0 +1,40 @@
+begin;
+insert into auth.users(id,email) values ('11111111-1111-4111-8111-111111111111','version@example.invalid');
+select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);
+insert into public.anios_academicos(id,anio,propietario_id) values('a1111111-1111-4111-8111-111111111111',2026,'11111111-1111-4111-8111-111111111111');
+insert into public.facultades(id,anio_academico_id,nombre) values('b1111111-1111-4111-8111-111111111111','a1111111-1111-4111-8111-111111111111','Facultad');
+insert into public.escuelas(id,facultad_id,nombre) values('c1111111-1111-4111-8111-111111111111','b1111111-1111-4111-8111-111111111111','Escuela');
+insert into public.promociones_ciclos(id,escuela_id,denominacion) values('d1111111-1111-4111-8111-111111111111','c1111111-1111-4111-8111-111111111111','Ciclo');
+insert into public.cursos(id,promocion_ciclo_id,nombre) values('e1111111-1111-4111-8111-111111111111','d1111111-1111-4111-8111-111111111111','Curso');
+insert into public.evaluaciones(id,curso_id,titulo,puntaje_total_maximo) values('f1111111-1111-4111-8111-111111111111','e1111111-1111-4111-8111-111111111111','Evaluación',20);
+insert into storage.objects(bucket_id,name) values('evaluaciones','11111111-1111-4111-8111-111111111111/f1111111-1111-4111-8111-111111111111/examen.jpg');
+select public.configurar_modalidad_recepcion('f1111111-1111-4111-8111-111111111111','manual',null);
+select public.guardar_rubrica('f1111111-1111-4111-8111-111111111111','[{"numero_pregunta":1,"puntaje_maximo":20,"respuesta_esperada":"Original"}]');
+do $$ declare examen uuid; intento jsonb; criterio_anterior uuid; begin
+ examen := (public.registrar_archivo('f1111111-1111-4111-8111-111111111111','examen','examen.jpg','imagen','11111111-1111-4111-8111-111111111111/f1111111-1111-4111-8111-111111111111/examen.jpg',1)->>'id')::uuid;
+ if not exists(select 1 from public.historial_entregas_estudiantes where examen_estudiante_id=examen and numero_entrega=1 and ruta_archivo like '%/examen.jpg') then raise exception 'La carga manual no tiene historial inicial'; end if;
+ begin
+  delete from public.historial_entregas_estudiantes where examen_estudiante_id=examen;
+  set constraints all immediate;
+  raise exception 'Se aceptó un examen sin ninguna entrega';
+ exception when check_violation then null; end;
+ set constraints all deferred;
+ intento:=public.iniciar_examen(examen);
+ perform public.guardar_resultado(examen,'{"nombre_estudiante":"Ana","codigo_estudiante":"1","observaciones_generales":"","preguntas":[{"numero_pregunta":1,"puntaje_obtenido":10,"respuesta_detectada":"A","justificacion":"Parcial"}]}',(intento->>'intento')::uuid,false);
+ select criterio_versionado_id into criterio_anterior from public.detalles_preguntas where examen_estudiante_id=examen;
+ if not exists(select 1 from privado.criterios_versionados where id=criterio_anterior and respuesta_esperada='Original' and puntaje_maximo=20) then raise exception 'No se guardó el criterio original'; end if;
+ perform public.reiniciar_examen(examen);
+ perform public.guardar_rubrica('f1111111-1111-4111-8111-111111111111','[{"numero_pregunta":1,"puntaje_maximo":10,"respuesta_esperada":"Nueva"},{"numero_pregunta":2,"puntaje_maximo":10,"respuesta_esperada":"Otra"}]');
+ if not exists(select 1 from public.detalles_preguntas d join privado.criterios_versionados c on c.id=d.criterio_versionado_id where d.examen_estudiante_id=examen and c.respuesta_esperada='Original' and c.puntaje_maximo=20) then raise exception 'Se perdió el criterio de la calificación anterior'; end if;
+ intento:=public.iniciar_examen(examen);
+ perform public.guardar_resultado(examen,'{"nombre_estudiante":"Ana","codigo_estudiante":"1","observaciones_generales":"","preguntas":[{"numero_pregunta":1,"puntaje_obtenido":5,"respuesta_detectada":"A","justificacion":"Parcial"},{"numero_pregunta":2,"puntaje_obtenido":6,"respuesta_detectada":"B","justificacion":"Parcial"}]}',(intento->>'intento')::uuid,false);
+ if (select count(*) from public.detalles_preguntas d join privado.criterios_versionados c on c.id=d.criterio_versionado_id where d.examen_estudiante_id=examen and c.puntaje_maximo=10)<>2 then raise exception 'La nueva calificación no usa la nueva rúbrica'; end if;
+ if (select public.nota_final(e) from public.examenes_estudiantes e where id=examen)<>11 then raise exception 'La nota no refleja sus preguntas'; end if;
+end $$;
+select public.iniciar_eliminacion_evaluacion('f1111111-1111-4111-8111-111111111111');
+select public.finalizar_eliminacion_evaluacion('f1111111-1111-4111-8111-111111111111','11111111-1111-4111-8111-111111111111');
+set constraints all immediate;
+do $$ begin
+ if exists(select 1 from privado.versiones_rubrica where evaluacion_id='f1111111-1111-4111-8111-111111111111') then raise exception 'La eliminación dejó versiones de rúbrica'; end if;
+end $$;
+rollback;

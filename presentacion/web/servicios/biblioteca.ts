@@ -69,6 +69,9 @@ export class ServicioBiblioteca {
       body: formulario,
     });
   }
+  async subirExamenFotos(id: string, formulario: FormData) {
+    await this.solicitar(`/evaluaciones/${id}/archivos-examen-fotos`, { method: "POST", body: formulario });
+  }
   configurarRecepcion(
     evaluacionId: string,
     abierta: boolean,

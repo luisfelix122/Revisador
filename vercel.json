@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [{ "path": "/api/recepcion/tareas/limpiar-archivos", "schedule": "0 5 * * *" }],
   "services": {
     "web": {
       "root": ".",

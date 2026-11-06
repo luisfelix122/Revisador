@@ -53,11 +53,11 @@ Las pruebas usan dobles únicamente en la frontera de proveedores externos; no c
 
 La recepción de alumnos requiere configurar `SUPABASE_CLAVE_SECRETA` únicamente en el entorno del servidor con una clave secreta del proyecto Supabase. Nunca debe añadirse al frontend, al repositorio ni a un archivo público. La API usa esa credencial exclusivamente para subir y registrar entregas; ante un rechazo confirmado intenta limpiar el archivo. El bucket permanece privado y el docente accede mediante su sesión. Sin esta variable, la API rechaza las entregas con un error de configuración. Las migraciones de recepción y restricción de funciones ya se aplicaron en el proyecto remoto; para otras bases deben aplicarse las migraciones locales correspondientes.
 
-Proyecto separado **revisador** (`xjmglxauhhgrkcowqgjm`), región São Paulo, creado con costo indicado de 0 USD/mes confirmado por el usuario. Migraciones aplicadas: `20261103221122_biblioteca_academica_3nf.sql` y `20261103223437_flujo_completo_seguro.sql`.
+Proyecto separado **revisador** (`xjmglxauhhgrkcowqgjm`), región São Paulo, creado con costo indicado de 0 USD/mes confirmado por el usuario. Las versiones de `supabase/migrations` coinciden con el historial aplicado en el proyecto. La propuesta anterior de validación de resultados, que no se aplicó y fue sustituida por `puntajes_aprobacion_y_precision`, se conserva en `docs/migraciones_historicas` fuera de la secuencia ejecutable.
 
 El año es único por profesor, no globalmente. Los descendientes heredan acceso mediante la visibilidad RLS de su padre, sin repetir el propietario en cada tabla. El navegador no utiliza claves privilegiadas. La escritura de archivos y resultados utiliza operaciones transaccionales que comprueban la propiedad.
 
-El asesor de seguridad no encontró incidencias. El asesor de rendimiento informa índices aún sin uso porque la base es nueva; se conservan los índices de claves foráneas. [Explicación del aviso](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index).
+Las funciones privilegiadas de recepción están aisladas en esquemas no expuestos. El asesor de seguridad advierte que la protección contra contraseñas filtradas está desactivada; Supabase no la incluye en su plan gratuito. El asesor de rendimiento informa índices nuevos sin uso; se conservan los índices necesarios para claves foráneas y limpieza. [Explicación del aviso](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index).
 
 ## Vercel
 

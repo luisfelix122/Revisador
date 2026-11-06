@@ -5,6 +5,29 @@ from presentacion.dependencias import obtener_proveedor
 import httpx
 
 
+def test_detalle_muestra_nota_y_entrega_derivadas_de_sus_registros(monkeypatch):
+    from uuid import uuid4
+    from unittest.mock import AsyncMock
+    from infraestructura.supabase import RepositorioSupabase, SesionProfesor
+    from presentacion.seguridad import obtener_repositorio
+    repositorio = RepositorioSupabase(SesionProfesor(uuid4(), 'token-prueba'))
+    evaluacion = {'id': str(uuid4()), 'examenes_estudiantes': [{
+        'nota_final': 99, 'ruta_imagen_examen': 'antigua.jpg', 'numero_entregas': 1,
+        'detalles_preguntas': [{'puntaje_obtenido': '0.10'}, {'puntaje_obtenido': '0.20'}],
+        'historial_entregas_estudiantes': [{'numero_entrega': 2, 'ruta_archivo': 'nueva.jpg'}, {'numero_entrega': 1, 'ruta_archivo': 'antigua.jpg'}],
+    }]}
+    monkeypatch.setattr(repositorio, 'solicitar', AsyncMock(return_value=[evaluacion]))
+    aplicacion.dependency_overrides[obtener_repositorio] = lambda: repositorio
+    try:
+        respuesta = TestClient(aplicacion).get(f"/api/evaluaciones/{evaluacion['id']}")
+        examen = respuesta.json()['examenes_estudiantes'][0]
+        assert examen['nota_final'] == 0.3
+        assert examen['numero_entregas'] == 2
+        assert examen['ruta_imagen_examen'] == 'nueva.jpg'
+    finally:
+        aplicacion.dependency_overrides.pop(obtener_repositorio, None)
+
+
 def test_eliminar_nodo_solicita_borrado_seguro_del_elemento():
     from uuid import uuid4
     from unittest.mock import AsyncMock
@@ -282,5 +305,35 @@ def test_no_inventa_costo_si_no_se_pueden_contar_paginas_del_pdf(monkeypatch):
         assert respuesta.status_code==200
         assert respuesta.json()['costo_usd'] is None
         assert respuesta.json()['paginas_examenes'] is None
+    finally:
+        aplicacion.dependency_overrides.pop(obtener_repositorio,None)
+
+
+def test_comprobacion_gemini_rechaza_respuesta_sin_texto(monkeypatch):
+    async def responder(cliente, metodo, url, **opciones):
+        return httpx.Response(200, json={'candidates':[{'finishReason':'STOP','content':{'parts':[]}}]})
+    monkeypatch.setattr(httpx.AsyncClient, 'request', responder)
+    respuesta = TestClient(aplicacion).post('/api/configuracion/comprobar-api', json={'proveedor':'gemini','clave_api':'prueba','modelo':'modelo'})
+    assert respuesta.status_code == 502
+    assert respuesta.json()['detalle']
+
+
+def test_docente_agrupa_fotos_de_un_alumno_en_un_solo_examen():
+    from io import BytesIO
+    from unittest.mock import AsyncMock
+    from uuid import uuid4
+    from PIL import Image
+    from pypdf import PdfReader
+    from presentacion.seguridad import obtener_repositorio
+    alumno=BytesIO(); Image.new('RGB',(30,20),'white').save(alumno,format='JPEG')
+    repo=type('RepositorioPrueba',(),{'sesion':type('Sesion',(),{'usuario_id':uuid4()})(), 'evaluacion':AsyncMock(return_value={}), 'solicitar':AsyncMock(), 'rpc':AsyncMock(return_value={'id':str(uuid4())})})()
+    aplicacion.dependency_overrides[obtener_repositorio]=lambda: repo
+    try:
+        fotos=[('archivos',('a.jpg',alumno.getvalue(),'image/jpeg')),('archivos',('b.jpg',alumno.getvalue(),'image/jpeg'))]
+        respuesta=TestClient(aplicacion).post(f'/api/evaluaciones/{uuid4()}/archivos-examen-fotos',data={'rotaciones':'[0,90]'},files=fotos)
+        assert respuesta.status_code==200
+        assert len(PdfReader(BytesIO(repo.solicitar.await_args.kwargs['contenido'])).pages)==2
+        assert repo.rpc.await_args.args[1]['p_formato']=='pdf'
+        repo.rpc.assert_awaited_once()
     finally:
         aplicacion.dependency_overrides.pop(obtener_repositorio,None)

@@ -8,13 +8,14 @@ from typing import Annotated, Literal
 from uuid import UUID, uuid4
 from urllib.parse import quote
 from pathlib import PurePath
-from fastapi import APIRouter, File, UploadFile, HTTPException, Response
+from fastapi import APIRouter, File, Form, UploadFile, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from presentacion.biblioteca import Repositorio
 from presentacion.esquemas import ConfiguracionIA
 from aplicacion.dto_ia import SalidaRubrica, SalidaCalificacion
-from infraestructura.archivos import ExtraerDocumento
+from infraestructura.archivos import ExtraerDocumento, crear_pdf_fotos
+from presentacion.recepcion import leer_fotos
 from infraestructura.documentos_privados import DocumentosPrivados
 from infraestructura.proveedores import ProveedorHTTP
 from infraestructura.tarifas_ia import ServicioTarifasOficiales
@@ -36,8 +37,8 @@ async def subir_archivo(identificador: UUID,tipo: Literal['solucion','material',
     if len(nombre)>255:
         raise HTTPException(422,'Nombre de archivo demasiado largo')
     documento = await asyncio.to_thread(ExtraerDocumento().extraer,nombre,contenido)
-    if tipo=='examen' and documento.tipo!='imagen':
-        raise HTTPException(422,'Cada examen debe ser una imagen JPG, PNG o WEBP')
+    if tipo=='examen' and documento.tipo not in ('imagen','pdf'):
+        raise HTTPException(422,'Cada examen debe ser una imagen o PDF')
     ruta = f'{repositorio.sesion.usuario_id}/{identificador}/{uuid4()}{PurePath(nombre).suffix.lower()}'
     mime = {'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.pdf':'application/pdf','.docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}[PurePath(nombre).suffix.lower()]
     await repositorio.solicitar('POST','/storage/v1/object/evaluaciones/'+ruta,contenido=contenido,cabeceras={'Content-Type':mime})
@@ -49,6 +50,17 @@ async def subir_archivo(identificador: UUID,tipo: Literal['solucion','material',
         except Exception:
             pass
         raise
+
+
+@enrutador.post('/{identificador}/archivos-examen-fotos')
+async def subir_examen_fotos(identificador: UUID, repositorio: Repositorio, archivos: list[UploadFile] = File(...), rotaciones: str = Form(...)):
+    await repositorio.evaluacion(identificador)
+    fotos, giros = await leer_fotos(archivos, rotaciones)
+    try:
+        pdf = await asyncio.to_thread(crear_pdf_fotos, fotos, giros)
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from None
+    return await subir_archivo(identificador, 'examen', repositorio, UploadFile(filename='examen.pdf', file=BytesIO(pdf)))
 
 
 class ConfirmacionIA(ConfiguracionIA):

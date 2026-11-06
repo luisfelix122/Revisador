@@ -1,0 +1,32 @@
+begin;
+insert into auth.users(id,email) values ('11111111-1111-4111-8111-111111111111','limpieza@example.invalid');
+select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);
+insert into public.anios_academicos(id,anio,propietario_id) values('a1111111-1111-4111-8111-111111111111',2026,'11111111-1111-4111-8111-111111111111');
+insert into public.facultades(id,anio_academico_id,nombre) values('b1111111-1111-4111-8111-111111111111','a1111111-1111-4111-8111-111111111111','Facultad');
+insert into public.escuelas(id,facultad_id,nombre) values('c1111111-1111-4111-8111-111111111111','b1111111-1111-4111-8111-111111111111','Escuela');
+insert into public.promociones_ciclos(id,escuela_id,denominacion) values('d1111111-1111-4111-8111-111111111111','c1111111-1111-4111-8111-111111111111','Ciclo');
+insert into public.cursos(id,promocion_ciclo_id,nombre) values('e1111111-1111-4111-8111-111111111111','d1111111-1111-4111-8111-111111111111','Curso');
+insert into public.evaluaciones(id,curso_id,titulo,puntaje_total_maximo,token_recepcion) values('f1111111-1111-4111-8111-111111111111','e1111111-1111-4111-8111-111111111111','Evaluación',20,'99999999-9999-4999-8999-999999999999');
+insert into storage.objects(bucket_id,name) values ('evaluaciones','estudiantes/f1111111-1111-4111-8111-111111111111/valido.pdf'), ('evaluaciones','estudiantes/f1111111-1111-4111-8111-111111111111/huerfano.pdf'), ('evaluaciones','11111111-1111-4111-8111-111111111111/f1111111-1111-4111-8111-111111111111/manual.pdf');
+select public.configurar_modalidad_recepcion('f1111111-1111-4111-8111-111111111111','manual',null);
+select public.registrar_archivo('f1111111-1111-4111-8111-111111111111','examen','manual.pdf','pdf','11111111-1111-4111-8111-111111111111/f1111111-1111-4111-8111-111111111111/manual.pdf',2);
+select public.configurar_modalidad_recepcion('f1111111-1111-4111-8111-111111111111','manual',true);
+select public.configurar_modalidad_recepcion('f1111111-1111-4111-8111-111111111111','alumnos',null);
+select public.configurar_recepcion_docente('f1111111-1111-4111-8111-111111111111',true,30,false,10);
+select public.reservar_archivo_entrega('99999999-9999-4999-8999-999999999999','estudiantes/f1111111-1111-4111-8111-111111111111/valido.pdf');
+select public.registrar_entrega_estudiante('99999999-9999-4999-8999-999999999999','Ana','001','estudiantes/f1111111-1111-4111-8111-111111111111/valido.pdf');
+select public.reservar_archivo_entrega('99999999-9999-4999-8999-999999999999','estudiantes/f1111111-1111-4111-8111-111111111111/huerfano.pdf');
+update privado.archivos_recepcion_pendientes set creado_en=now()-interval '2 hours';
+do $$ declare rutas jsonb; begin
+ if has_function_privilege('anon','public.reservar_archivo_entrega(uuid,text)','execute') or has_function_privilege('authenticated','public.reclamar_limpieza_entregas(integer)','execute') then raise exception 'Permisos públicos indebidos'; end if;
+ rutas:=public.reclamar_limpieza_entregas(100);
+ if jsonb_array_length(rutas)<>1 or rutas->>0 not like '%huerfano.pdf' then raise exception 'Limpieza seleccionó rutas incorrectas: %',rutas; end if;
+ if not exists(select 1 from public.historial_entregas_estudiantes where ruta_archivo like '%valido.pdf') then raise exception 'Entrega registrada perdida'; end if;
+ begin
+  perform public.registrar_entrega_estudiante('99999999-9999-4999-8999-999999999999','Otra','002','estudiantes/f1111111-1111-4111-8111-111111111111/huerfano.pdf');
+  raise exception 'Se permitió registrar una carga en limpieza';
+ exception when sqlstate '42300' then null; end;
+ perform public.confirmar_limpieza_entregas(rutas);
+ if exists(select 1 from privado.archivos_recepcion_pendientes) then raise exception 'Quedaron reservas procesadas'; end if;
+end $$;
+rollback;

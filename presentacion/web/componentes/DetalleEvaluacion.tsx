@@ -24,6 +24,7 @@ import {
 } from "../servicios/biblioteca";
 import { leerCredenciales } from "../servicios/credenciales";
 import { Ventana } from "./Ventana";
+import { SelectorPaginas, prepararFotos, type PaginaExamen } from "./SelectorPaginas";
 
 interface Preparacion {
   examenes: number;
@@ -69,6 +70,7 @@ export function DetalleEvaluacion({
     [busqueda, buscar] = usarEstado(""),
     [filtro, filtrar] = usarEstado("todos"),
     [minimoEditable, cambiarMinimoEditable] = usarEstado(""),
+    [paginasDocente, cambiarPaginasDocente] = usarEstado<PaginaExamen[]>([]),
     [paso, cambiarPaso] = usarEstado<1 | 2 | 3>(1),
     [revisando, revisar] = usarEstado<Examen | null>(null);
   const modoEntrega = evaluacion?.modalidad_recepcion ?? "alumnos";
@@ -195,6 +197,18 @@ export function DetalleEvaluacion({
       await cargar().catch(() => {});
       ocupar(false);
     }
+  };
+  const subirFotosAlumno = async () => {
+    if (!paginasDocente.length) return;
+    ocupar(true); mostrarError(""); avisar(""); invalidar();
+    try {
+      const formulario = await prepararFotos(paginasDocente);
+      await servicio.subirExamenFotos(identificador, formulario);
+      cambiarPaginasDocente([]);
+      await cargar();
+      avisar("Las fotos se guardaron juntas como un examen.");
+    } catch (problema) { mostrarError(mensaje(problema)); }
+    finally { ocupar(false); }
   };
   const analizar = async () => {
     ocupar(true);
@@ -597,7 +611,8 @@ export function DetalleEvaluacion({
               {evaluacion.examenes_estudiantes.length}/100 exámenes guardados
             </span>
           </label>
-              <label className="casilla"><input type="checkbox" checked={manualFinalizada} disabled={!evaluacion.examenes_estudiantes.length || ocupado} onChange={(evento) => void actualizarModalidad("manual", evento.target.checked)} />Terminé de cargar los exámenes</label>
+              <label className="casilla"><input type="checkbox" checked={manualFinalizada} disabled={!evaluacion.examenes_estudiantes.length || ocupado || paginasDocente.length > 0} onChange={(evento) => void actualizarModalidad("manual", evento.target.checked)} />Terminé de cargar los exámenes</label>
+              {!manualFinalizada && <div className="carga-varias-paginas"><h4>Varias fotos de un estudiante</h4><p>Selecciona todas las páginas de un alumno para guardarlas como un solo examen.</p><SelectorPaginas paginas={paginasDocente} alCambiar={cambiarPaginasDocente} deshabilitado={ocupado || corriendo || bloqueada} /><button type="button" className="boton-primario" disabled={!paginasDocente.length || ocupado || corriendo || bloqueada} onClick={() => void subirFotosAlumno()}>Guardar examen de este estudiante</button></div>}
             </div>
           )}
           {!recepcionTerminada && <p className="ayuda-campo">Para analizar la solución, termina la carga manual o espera a que se complete el aforo o se cierre la recepción.</p>}

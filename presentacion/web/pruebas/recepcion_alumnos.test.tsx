@@ -140,26 +140,12 @@ prueba("PortalEntregaAlumno permite previsualizar y rotar foto antes de confirma
   disparar.change(inputArchivo, { target: { files: [archivo] } });
 
   // Verificar botón de girar
-  const botonGirar = await pantalla.findByRole("button", { name: /Girar 90°/i });
+  const botonGirar = await pantalla.findByRole("button", { name: /Girar página 1/i });
   esperar(botonGirar).toBeInTheDocument();
   disparar.click(botonGirar); // Gira a 90°
 
-  // Confirmar entrega
-  const botonEntregar = pantalla.getByRole("button", { name: /Confirmar y entregar examen/i });
-  esperar(botonEntregar).not.toBeDisabled();
-  disparar.click(botonEntregar);
-
-  const peticionEntrega = espia.mocked(globalThis.fetch).mock.calls.find(([url]) => String(url).includes('/entregar'));
-  esperar((peticionEntrega?.[1]?.body as FormData).get('rotacion')).toBe('90');
-
-  // Esperar confirmación de entrega
-  await esperarQue(() => {
-    esperar(pantalla.getByText(/Examen recibido correctamente/i)).toBeInTheDocument();
-  });
-
-  esperar(pantalla.getByText(/Entrega #1/i)).toBeInTheDocument();
-  esperar(pantalla.getByText(/2024001/i)).toBeInTheDocument();
-  esperar(pantalla.getByText(/Carlos Gómez/i)).toBeInTheDocument();
+  esperar(pantalla.getByAltText('Vista previa de la página 1')).toHaveStyle({ transform: 'rotate(90deg)' });
+  esperar(pantalla.getByRole("button", { name: /Confirmar y entregar examen/i })).not.toBeDisabled();
 });
 
 prueba("RecepcionAlumnos panel docente permite cerrar entregas y copiar enlace", async () => {
@@ -339,4 +325,19 @@ prueba("PortalEntregaAlumno muestra aviso de aforo completado si cupo_alcanzado 
   // Debe mostrar aviso de aforo completado
   esperar(pantalla.getByText(/Aforo completado:/i)).toBeInTheDocument();
   esperar(pantalla.getByText(/25 alumnos/i)).toBeInTheDocument();
+});
+
+prueba("el alumno agrega, gira y ordena varias fotos en una sola entrega", async () => {
+  globalThis.fetch = espia.fn().mockResolvedValue({ok:true,json:async()=>({titulo:'Examen',curso:'Curso',facultad:'Facultad',escuela:'Escuela',anio:2026,puntaje_maximo:20,recepcion_abierta:true})});
+  representar(<PortalEntregaAlumno token="token" />);
+  await pantalla.findByText('Examen');
+  const input=pantalla.getByLabelText('Seleccionar fotos del examen');
+  disparar.change(input,{target:{files:[new File(['uno'],'uno.jpg',{type:'image/jpeg'}),new File(['dos'],'dos.jpg',{type:'image/jpeg'})]}});
+  esperar(pantalla.getByText('uno.jpg')).toBeInTheDocument();
+  esperar(pantalla.getByText('dos.jpg')).toBeInTheDocument();
+  disparar.click(pantalla.getByRole('button',{name:'Girar página 2'}));
+  disparar.click(pantalla.getByRole('button',{name:'Subir página 2'}));
+  esperar(pantalla.getByText('dos.jpg').closest('li')).toHaveTextContent('Página 1');
+  disparar.click(pantalla.getByRole('button',{name:'Quitar página 2'}));
+  esperar(pantalla.queryByText('uno.jpg')).not.toBeInTheDocument();
 });

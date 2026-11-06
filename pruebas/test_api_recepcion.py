@@ -77,7 +77,7 @@ def test_entrega_no_borra_archivo_si_no_se_conoce_resultado_del_registro():
     Image.new('RGB', (20, 20), 'white').save(archivo, format='PNG')
     with patch('infraestructura.supabase.RepositorioSupabase.rpc_publico', new_callable=AsyncMock, return_value={'evaluacion_id': str(uuid4()), 'recepcion_abierta': True}), \
          patch('infraestructura.supabase.RepositorioSupabase.subir_archivo_publico', new_callable=AsyncMock, return_value='examen.jpg'), \
-         patch('infraestructura.supabase.RepositorioSupabase.rpc_recepcion', new_callable=AsyncMock, side_effect=ErrorPersistencia('Conexión interrumpida', 503)), \
+         patch('infraestructura.supabase.RepositorioSupabase.rpc_recepcion', new_callable=AsyncMock, side_effect=[{'reservado': True}, ErrorPersistencia('Conexión interrumpida', 503)]), \
          patch('infraestructura.supabase.RepositorioSupabase.borrar_archivo_recepcion', new_callable=AsyncMock) as borrar:
         respuesta = cliente.post(f'/api/recepcion/{uuid4()}/entregar', data={'nombre': 'Ana', 'codigo': '123'}, files={'archivo': ('examen.png', archivo.getvalue(), 'image/png')})
     assert respuesta.status_code == 503
@@ -234,7 +234,7 @@ def test_entregar_examen_rechazado_si_cupo_superado():
          patch("infraestructura.supabase.RepositorioSupabase.subir_archivo_publico", new_callable=AsyncMock) as mock_up:
         
         mock_rpc.return_value = datos_eval_mock
-        mock_registro.side_effect = ErrorPersistencia("Se ha alcanzado el límite de estudiantes esperados (30 alumnos) para este examen. Si estás en el aula, consulta con tu docente.", 423)
+        mock_registro.side_effect = [{'reservado': True}, ErrorPersistencia("Se ha alcanzado el límite de estudiantes esperados (30 alumnos) para este examen. Si estás en el aula, consulta con tu docente.", 423)]
         mock_up.return_value = "public/eval/examen_31.jpg"
 
         archivos = {"archivo": ("examen.png", img_bytes.getvalue(), "image/png")}
@@ -245,3 +245,31 @@ def test_entregar_examen_rechazado_si_cupo_superado():
         assert "límite de estudiantes esperados" in respuesta.json()["detail"]
         mock_borrar.assert_awaited_once_with("public/eval/examen_31.jpg")
 
+
+
+def test_alumno_envia_varias_fotos_como_un_solo_examen_pdf():
+    from io import BytesIO
+    from PIL import Image
+    from pypdf import PdfReader
+    fotos=[]
+    for nombre,color in [('pagina1.png','white'),('pagina2.png','blue')]:
+        imagen=BytesIO(); Image.new('RGB',(40,30),color).save(imagen,format='PNG')
+        fotos.append(('archivos',(nombre,imagen.getvalue(),'image/png')))
+    with patch('infraestructura.supabase.RepositorioSupabase.rpc_publico',new_callable=AsyncMock,return_value={'evaluacion_id':str(uuid4()),'recepcion_abierta':True}), \
+         patch('infraestructura.supabase.RepositorioSupabase.rpc_recepcion',new_callable=AsyncMock,return_value={'numero_entrega':1}) as registrar, \
+         patch('infraestructura.supabase.RepositorioSupabase.subir_archivo_publico',new_callable=AsyncMock,return_value='estudiantes/examen.pdf') as subir:
+        respuesta=cliente.post(f'/api/recepcion/{uuid4()}/entregar-fotos',data={'nombre':'Ana','codigo':'123','rotaciones':'[0,90]'},files=fotos)
+        assert respuesta.status_code==200
+        assert len(PdfReader(BytesIO(subir.call_args.args[1])).pages)==2
+        assert [llamada.args[0] for llamada in registrar.await_args_list] == ['reservar_archivo_entrega', 'registrar_entrega_estudiante']
+
+
+def test_limpieza_requiere_secreto_y_confirma_despues_de_borrar(monkeypatch):
+    monkeypatch.setenv('CRON_SECRET', 'secreto-de-prueba')
+    with patch('infraestructura.supabase.RepositorioSupabase.rpc_recepcion', new_callable=AsyncMock, side_effect=[['estudiantes/e/archivo.jpg'], None]) as rpc, \
+         patch('infraestructura.supabase.RepositorioSupabase.borrar_archivos_recepcion', new_callable=AsyncMock) as borrar:
+        assert cliente.get('/api/recepcion/tareas/limpiar-archivos').status_code == 401
+        respuesta = cliente.get('/api/recepcion/tareas/limpiar-archivos', headers={'Authorization': 'Bearer secreto-de-prueba'})
+        assert respuesta.json() == {'archivos_limpiados': 1}
+        borrar.assert_awaited_once_with(['estudiantes/e/archivo.jpg'])
+        assert [llamada.args[0] for llamada in rpc.await_args_list] == ['reclamar_limpieza_entregas', 'confirmar_limpieza_entregas']

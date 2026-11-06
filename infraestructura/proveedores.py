@@ -159,8 +159,6 @@ class ProveedorHTTP:
                     raise ValueError('Sin candidatos')
                 partes = candidatos[0].get('content', {}).get('parts', [])
                 texto = ''.join(parte.get('text', '') for parte in partes if isinstance(parte, dict))
-                if not texto.strip() and candidatos[0].get('finishReason') in ('STOP', 'MAX_TOKENS', None):
-                    texto = 'OK'
             if not texto.strip():
                 raise ValueError('Respuesta vacía')
         except (KeyError, IndexError, TypeError, AttributeError, ValueError):

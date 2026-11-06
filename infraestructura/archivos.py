@@ -27,6 +27,29 @@ def convertir_imagen(imagen) -> str:
     return base64.b64encode(salida.getvalue()).decode('ascii')
 
 
+def crear_pdf_fotos(archivos: list[tuple[str, bytes]], rotaciones: list[int]) -> bytes:
+    if not 1 <= len(archivos) <= 20 or len(archivos) != len(rotaciones):
+        raise ValueError('Selecciona entre 1 y 20 fotos y revisa sus rotaciones.')
+    paginas = []
+    try:
+        for (nombre, contenido), rotacion in zip(archivos, rotaciones):
+            if rotacion not in (0, 90, 180, 270):
+                raise ValueError('La rotación de una foto no es válida.')
+            documento = ExtraerDocumento().extraer(nombre, contenido)
+            if documento.tipo != 'imagen':
+                raise ValueError('Para agrupar páginas selecciona únicamente fotos JPG, PNG o WEBP.')
+            with Imagen.open(BytesIO(base64.b64decode(documento.imagenes[0]))) as imagen:
+                paginas.append(imagen.rotate(-rotacion, expand=True).convert('RGB'))
+        salida = BytesIO()
+        paginas[0].save(salida, format='PDF', save_all=True, append_images=paginas[1:], resolution=100, quality=65)
+        if len(salida.getvalue()) > 3 * 1024 * 1024:
+            raise ValueError('Las fotos agrupadas superan 3 MB. Reduce el tamaño o la cantidad de fotos.')
+        return salida.getvalue()
+    finally:
+        for pagina in paginas:
+            pagina.close()
+
+
 class ExtraerDocumento:
     def extraer(self, nombre: str, contenido: bytes) -> DocumentoExtraido:
         if not contenido or len(contenido) > 3 * 1024 * 1024:

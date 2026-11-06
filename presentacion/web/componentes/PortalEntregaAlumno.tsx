@@ -1,14 +1,12 @@
-import { useState as usarEstado, useEffect as usarEfecto, useRef as usarReferencia } from "react";
+import { useState as usarEstado, useEffect as usarEfecto } from "react";
 import { TiempoRestante } from "./TiempoRestante";
+import { SelectorPaginas, prepararFotos, type PaginaExamen } from "./SelectorPaginas";
 import {
-  Camera as Camara,
   Upload as Subir,
-  RotateCw as Girar,
   CheckCircle2 as CheckExito,
   AlertCircle as Alerta,
   Clock as Reloj,
   Lock as Candado,
-  FileText as Documento,
   RefreshCw as Recargar,
   ArrowLeft as Regresar,
   Users as Usuarios
@@ -50,11 +48,8 @@ export function PortalEntregaAlumno({ token, alVolver }: Propiedades) {
   const [error, mostrarError] = usarEstado("");
   const [nombre, cambiarNombre] = usarEstado("");
   const [codigo, cambiarCodigo] = usarEstado("");
-  const [archivo, cambiarArchivo] = usarEstado<File | null>(null);
-  const [vistaPrevia, cambiarVistaPrevia] = usarEstado<string | null>(null);
-  const [rotacion, cambiarRotacion] = usarEstado(0);
+  const [paginas, cambiarPaginas] = usarEstado<PaginaExamen[]>([]);
   const [comprobante, cambiarComprobante] = usarEstado<ComprobanteEntrega | null>(null);
-  const inputArchivoRef = usarReferencia<HTMLInputElement | null>(null);
 
   const cargarInfo = async () => {
     cambiarCargando(true);
@@ -77,42 +72,13 @@ export function PortalEntregaAlumno({ token, alVolver }: Propiedades) {
     void cargarInfo();
   }, [token]);
 
-  const alSeleccionarArchivo = (evento: React.ChangeEvent<HTMLInputElement>) => {
-    const seleccionados = evento.target.files;
-    if (!seleccionados || !seleccionados.length) return;
-    const arch = seleccionados[0];
-    if (arch.size > 3 * 1024 * 1024) {
-      mostrarError("El archivo supera el tamaño máximo permitido de 3 MB.");
-      return;
-    }
-    cambiarArchivo(arch);
-    cambiarRotacion(0);
-    mostrarError("");
-
-    if (arch.type.startsWith("image/")) {
-      if (typeof window !== "undefined" && window.URL && typeof window.URL.createObjectURL === "function") {
-        cambiarVistaPrevia(window.URL.createObjectURL(arch));
-      } else {
-        const lector = new FileReader();
-        lector.onload = () => cambiarVistaPrevia(lector.result as string);
-        lector.readAsDataURL(arch);
-      }
-    } else {
-      cambiarVistaPrevia(null); // Es PDF
-    }
-  };
-
-  const rotarImagen = () => {
-    cambiarRotacion((prev) => (prev + 90) % 360);
-  };
-
   const enviarEntrega = async (evento: React.FormEvent) => {
     evento.preventDefault();
     if (!codigo.trim()) {
       mostrarError("Ingresa tu código universitario.");
       return;
     }
-    if (!archivo) {
+    if (!paginas.length) {
       mostrarError("Adjunta la foto o documento de tu examen.");
       return;
     }
@@ -121,15 +87,13 @@ export function PortalEntregaAlumno({ token, alVolver }: Propiedades) {
     mostrarError("");
 
     try {
-      const formulario = new FormData();
+      const esPdf = paginas.length === 1 && /\.pdf$/i.test(paginas[0].archivo.name);
+      const formulario = esPdf ? new FormData() : await prepararFotos(paginas);
       formulario.append("nombre", nombre.trim() || "nada");
       formulario.append("codigo", codigo.trim());
-      formulario.append("archivo", archivo);
-      formulario.append("rotacion", String(rotacion));
-
-      const respuesta = await fetch(`/api/recepcion/${token}/entregar`, {
-        method: "POST",
-        body: formulario,
+      if (esPdf) formulario.append("archivo", paginas[0].archivo);
+      const respuesta = await fetch(`/api/recepcion/${token}/${esPdf ? "entregar" : "entregar-fotos"}`, {
+        method: "POST", body: formulario,
       });
       const datos = await respuesta.json();
       if (!respuesta.ok) {
@@ -318,80 +282,9 @@ export function PortalEntregaAlumno({ token, alVolver }: Propiedades) {
             />
           </label>
 
-          {/* Selector de Archivo / Cámara */}
           <div style={{ marginBottom: "16px" }}>
-            <span style={{ display: "block", fontSize: "0.88rem", fontWeight: 500, color: "#202124", marginBottom: "6px" }}>
-              Foto o archivo del examen (Máximo 3 MB)
-            </span>
-
-            <input
-              ref={inputArchivoRef}
-              type="file"
-              accept="image/*,.pdf"
-              capture="environment"
-              onChange={alSeleccionarArchivo}
-              style={{ display: "none" }}
-            />
-
-            {!archivo ? (
-              <button
-                type="button"
-                className="boton-contorno"
-                disabled={enviando}
-                onClick={() => inputArchivoRef.current?.click()}
-                style={{ width: "100%", padding: "16px", border: "2px dashed #dadce0", borderRadius: "8px", background: "#f8f9fa", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", cursor: "pointer" }}
-              >
-                <Camara size={28} color="#1a73e8" />
-                <span style={{ fontSize: "0.92rem", fontWeight: 500, color: "#1a73e8" }}>Tomar foto o subir archivo (PDF / Imagen)</span>
-                <span style={{ fontSize: "0.78rem", color: "#5f6368" }}>Asegúrate de que las respuestas y tu letra sean legibles</span>
-              </button>
-            ) : (
-              <div style={{ border: "1px solid #dadce0", borderRadius: "8px", padding: "12px", background: "#f8f9fa" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.88rem", color: "#202124" }}>
-                    <Documento size={18} color="#1a73e8" />
-                    <strong>{archivo.name}</strong> ({(archivo.size / 1024).toFixed(1)} KB)
-                  </div>
-                  <button
-                    type="button"
-                    className="boton-texto"
-                    onClick={() => inputArchivoRef.current?.click()}
-                    style={{ fontSize: "0.82rem", color: "#1a73e8" }}
-                  >
-                    Cambiar archivo
-                  </button>
-                </div>
-
-                {/* Vista previa con rotación interactiva */}
-                {vistaPrevia && (
-                  <div style={{ textAlign: "center", marginTop: "8px" }}>
-                    <div style={{ overflow: "hidden", maxHeight: "300px", background: "#202124", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", padding: "8px" }}>
-                      <img
-                        src={vistaPrevia}
-                        alt="Vista previa del examen"
-                        style={{
-                          maxHeight: "280px",
-                          maxWidth: "100%",
-                          objectFit: "contain",
-                          transform: `rotate(${rotacion}deg)`,
-                          transition: "transform 0.2s ease-in-out",
-                        }}
-                      />
-                    </div>
-                    <div style={{ marginTop: "8px", display: "flex", justifyContent: "center", gap: "10px" }}>
-                      <button
-                        type="button"
-                        className="boton-contorno"
-                        onClick={rotarImagen}
-                        style={{ padding: "6px 12px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
-                      >
-                        <Girar size={14} /> Girar 90°
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            <span style={{ display: "block", fontSize: "0.88rem", fontWeight: 500, marginBottom: "8px" }}>Páginas de tu examen</span>
+            <SelectorPaginas paginas={paginas} alCambiar={cambiarPaginas} deshabilitado={enviando} permitirPdf />
           </div>
 
           {error && (
@@ -404,7 +297,7 @@ export function PortalEntregaAlumno({ token, alVolver }: Propiedades) {
           <button
             type="submit"
             className="boton-primario"
-            disabled={enviando || !archivo || !codigo.trim()}
+            disabled={enviando || !paginas.length || !codigo.trim()}
             style={{ width: "100%", padding: "12px", fontSize: "1rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
           >
             <Subir size={18} />

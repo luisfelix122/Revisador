@@ -46,6 +46,8 @@ do $$declare v_archivo jsonb; v_examen uuid; v_intento jsonb; begin
  v_examen := (v_archivo->>'id')::uuid;
  v_intento := public.iniciar_examen(v_examen);
  perform public.guardar_resultado(v_examen,'{"nombre_estudiante":"Prueba","codigo_estudiante":"1","observaciones_generales":"","preguntas":[{"numero_pregunta":1,"puntaje_obtenido":10.5,"respuesta_detectada":"respuesta","justificacion":"correcta"}]}',(v_intento->>'intento')::uuid,false);
+ delete from storage.objects where bucket_id='evaluaciones' and name='11111111-1111-4111-8111-111111111111/f1111111-1111-4111-8111-111111111111/examen.png';
+ if found then raise exception 'Se permitió borrar el archivo de un examen registrado'; end if;
  if (select estado from public.evaluaciones where id='f1111111-1111-4111-8111-111111111111') <> 'calificado' then raise exception 'No se completó la evaluación'; end if;
  begin
   perform public.guardar_resultado(v_examen,'{"nombre_estudiante":"Prueba","codigo_estudiante":"1","observaciones_generales":"","preguntas":[{"numero_pregunta":1,"puntaje_obtenido":10.504,"respuesta_detectada":"respuesta","justificacion":"correcta"}]}',null,true);
@@ -53,7 +55,7 @@ do $$declare v_archivo jsonb; v_examen uuid; v_intento jsonb; begin
  exception when raise_exception then
   if SQLERRM='Se aceptó un puntaje con más de dos decimales' then raise; end if;
  end;
- if (select nota_final from public.examenes_estudiantes where id=v_examen) <> 10.5 then raise exception 'El resultado anterior fue alterado'; end if;
+ if (select public.nota_final(e) from public.examenes_estudiantes e where id=v_examen) <> 10.5 then raise exception 'El resultado anterior fue alterado'; end if;
  begin
   perform public.guardar_resultado(v_examen,'{"nombre_estudiante":"Prueba","codigo_estudiante":"1","observaciones_generales":"","preguntas":[{"numero_pregunta":1,"puntaje_obtenido":20.004,"respuesta_detectada":"respuesta","justificacion":"correcta"}]}',null,true);
   raise exception 'Se aceptó un puntaje superior al máximo';

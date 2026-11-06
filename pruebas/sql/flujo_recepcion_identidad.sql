@@ -32,6 +32,10 @@ do $$ begin
     perform public.configurar_puntaje_aprobatorio('f1111111-1111-4111-8111-111111111111', 5);
     raise exception 'Se permitió cambiar el mínimo de otro docente';
   exception when insufficient_privilege then null; end;
+  begin
+    perform public.configurar_recepcion_docente('f1111111-1111-4111-8111-111111111111',true,30,false,10);
+    raise exception 'Se permitió abrir la recepción de otro docente';
+  exception when insufficient_privilege then null; end;
 end $$;
 select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);
 select public.configurar_modalidad_recepcion('f1111111-1111-4111-8111-111111111111','manual',null);
@@ -50,7 +54,7 @@ reset role;
 select public.registrar_entrega_estudiante('99999999-9999-4999-8999-999999999999','Ana Estudiante','COD-001','estudiantes/f1111111-1111-4111-8111-111111111111/estudiante.pdf');
 do $$ declare v_examen uuid; v_manual uuid; intento jsonb; resultado jsonb; begin
  select id into v_examen from public.examenes_estudiantes where codigo_estudiante='COD-001';
- select id into v_manual from public.examenes_estudiantes where ruta_imagen_examen like '%/manual.jpg';
+ select e.id into v_manual from public.examenes_estudiantes e where public.ruta_imagen_examen(e) like '%/manual.jpg';
  intento:=public.iniciar_examen(v_examen);
  resultado:=public.guardar_resultado(v_examen,'{"nombre_estudiante":"nada","codigo_estudiante":"nada","observaciones_generales":"","preguntas":[{"numero_pregunta":1,"puntaje_obtenido":10,"respuesta_detectada":"A","justificacion":"Correcta"}]}',(intento->>'intento')::uuid,false);
  if not exists(select 1 from public.examenes_estudiantes where id=v_examen and nombre_estudiante='Ana Estudiante' and codigo_estudiante='COD-001') then raise exception 'La IA modificó la identidad entregada'; end if;
@@ -63,4 +67,5 @@ do $$ declare v_examen uuid; v_manual uuid; intento jsonb; resultado jsonb; begi
  resultado:=public.registrar_entrega_estudiante('99999999-9999-4999-8999-999999999999','Ana Corregida','COD-001','estudiantes/f1111111-1111-4111-8111-111111111111/reenvio.pdf');
  if (resultado->>'numero_entrega')::int<>2 then raise exception 'El reenvío no conserva el código'; end if;
 end $$;
+set constraints all immediate;
 rollback;
