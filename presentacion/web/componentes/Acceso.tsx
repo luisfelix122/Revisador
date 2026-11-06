@@ -1,6 +1,7 @@
 import { useState as usarEstado } from "react";
 import type { SupabaseClient as ClienteSupabase } from "@supabase/supabase-js";
 import { ShieldCheck as Escudo } from "lucide-react";
+import { CarruselAcceso } from "./CarruselAcceso";
 
 export function Acceso({ cliente }: { cliente: ClienteSupabase }) {
   const [registro, cambiarRegistro] = usarEstado(false);
@@ -54,9 +55,10 @@ export function Acceso({ cliente }: { cliente: ClienteSupabase }) {
         <strong>Revisador</strong>
         <span>Tu espacio docente</span>
       </header>
-      <main className="acceso">
+      <main className="cuerpo-acceso">
+        <section className="acceso" aria-labelledby="titulo-acceso">
         <Escudo size={32} className="azul" />
-        <h1>
+        <h1 id="titulo-acceso">
           {registro ? "Crea tu cuenta docente" : "Bienvenido a Revisador"}
         </h1>
         <p>
@@ -117,6 +119,8 @@ export function Acceso({ cliente }: { cliente: ClienteSupabase }) {
           Tu clave de IA se configura después y no se guarda en nuestra base de
           datos.
         </p>
+        </section>
+        <CarruselAcceso />
       </main>
     </div>
   );
