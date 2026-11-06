@@ -282,6 +282,14 @@ export function Revisador() {
         }}
         alAbrirEvaluacion={abrirEvaluacion}
         alCerrarSesion={() => void salir()}
+        nombrePerfil={typeof sesion.user.user_metadata?.nombre === "string" ? sesion.user.user_metadata.nombre : ""}
+        correoPerfil={sesion.user.email || ""}
+        alGuardarPerfil={async (nombre) => {
+          const { data, error: problema } = await cliente.auth.updateUser({ data: { nombre } });
+          if (problema || !data.user) throw new Error("No se pudo guardar el perfil.");
+          const usuarioActualizado = data.user;
+          cambiarSesion((actual) => actual?.user.id === usuarioActualizado.id ? { ...actual, user: usuarioActualizado } : actual);
+        }}
         alVerificarIA={verificar}
         alVolverBiblioteca={() => abrirEvaluacion(null)}
         contenido={

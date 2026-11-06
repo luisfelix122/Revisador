@@ -1738,3 +1738,22 @@ input[type="checkbox"] {
   .carrusel-introduccion h2 { font-size: 31px; }
   .carrusel-muestra { margin-top: 24px; }
 }
+
+/* Cuenta docente */
+.cuenta-contenedor { position: relative; }
+.avatar { cursor: pointer; }
+.avatar:hover, .avatar[aria-expanded="true"] { background: #dce8fa; color: #185abc; }
+.menu-cuenta { position: absolute; right: 0; top: calc(100% + 12px); z-index: 50; width: min(290px, calc(100vw - 24px)); background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 8px 24px #20212424; padding: 8px; }
+.cuenta-identidad { padding: 10px 12px 13px; border-bottom: 1px solid #e8eaed; margin-bottom: 5px; }
+.cuenta-identidad strong, .cuenta-identidad span { display: block; overflow-wrap: anywhere; }
+.cuenta-identidad strong { font-size: 13px; font-weight: 600; color: #202124; }
+.cuenta-identidad span { color: #5f6368; font-size: 12px; margin-top: 5px; }
+.menu-cuenta > button { display: flex; width: 100%; align-items: center; gap: 12px; padding: 11px 12px; border: 0; border-radius: 7px; background: transparent; color: #202124; text-align: left; font-size: 13px; cursor: pointer; }
+.menu-cuenta > button svg { color: #5f6368; flex: none; }
+.menu-cuenta > button:hover, .menu-cuenta > button:focus-visible { background: #f1f3f4; }
+.perfil-formulario > p { color: #5f6368; font-size: 13px; line-height: 1.5; }
+.perfil-formulario > .error { color: #b3261e; }
+.perfil-formulario > .exito { color: #137333; }
+.perfil-formulario input[readonly] { background: #f8f9fa; color: #5f6368; }
+.perfil-formulario .perfil-ayuda { margin-top: -8px; font-size: 12px; }
+.perfil-acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }

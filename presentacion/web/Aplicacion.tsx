@@ -29,6 +29,7 @@ import {
 import { Configuracion } from "./componentes/Configuracion";
 import { Explorador } from "./componentes/Explorador";
 import { Ventana } from "./componentes/Ventana";
+import { MenuCuenta } from "./componentes/MenuCuenta";
 import type { NodoAcademico, EvaluacionResumen } from "./tipos";
 import { usarPanelMovil } from "./servicios/usarPanelMovil";
 
@@ -49,6 +50,9 @@ interface Propiedades {
   alRenombrarEvaluacion?: (id: string, nombre: string) => void;
   alEliminarEvaluacion?: (id: string, nombre: string) => void;
   alCerrarSesion?: () => void;
+  nombrePerfil?: string;
+  correoPerfil?: string;
+  alGuardarPerfil?: (nombre: string) => Promise<void>;
   alVerificarIA?: (verificada: boolean) => void;
   alVolverBiblioteca?: () => void;
   nodos?: NodoAcademico[];
@@ -68,6 +72,9 @@ export function Aplicacion({
   alRenombrarEvaluacion,
   alEliminarEvaluacion,
   alCerrarSesion,
+  nombrePerfil = "",
+  correoPerfil = "",
+  alGuardarPerfil,
   alVerificarIA,
   alVolverBiblioteca,
   nodos = [],
@@ -200,16 +207,7 @@ export function Aplicacion({
           >
             <Ajustes size={21} />
           </button>
-          <button
-            className="avatar"
-            aria-label={
-              alCerrarSesion ? "Cerrar sesión" : "Espacio del profesor"
-            }
-            title={alCerrarSesion ? "Cerrar sesión" : "Espacio del profesor"}
-            onClick={alCerrarSesion}
-          >
-            P
-          </button>
+          <MenuCuenta nombre={nombrePerfil} correo={correoPerfil} alGuardar={alGuardarPerfil} alSalir={alCerrarSesion} />
         </div>
       </header>
       {lateralAbierto && (
