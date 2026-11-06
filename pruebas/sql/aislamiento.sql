@@ -39,6 +39,7 @@ do $$begin
  exception when raise_exception then if SQLERRM='Se aceptó rúbrica con suma incorrecta' then raise; end if; end;
  if (select puntaje_maximo from public.criterios_preguntas limit 1)<>20 then raise exception 'Una escritura fallida no fue atómica'; end if;
 end $$;
+select public.configurar_modalidad_recepcion('f1111111-1111-4111-8111-111111111111','manual',null);
 insert into storage.objects(bucket_id,name) values('evaluaciones','11111111-1111-4111-8111-111111111111/f1111111-1111-4111-8111-111111111111/examen.png');
 do $$declare v_archivo jsonb; v_examen uuid; v_intento jsonb; begin
  v_archivo := public.registrar_archivo('f1111111-1111-4111-8111-111111111111','examen','examen.png','imagen','11111111-1111-4111-8111-111111111111/f1111111-1111-4111-8111-111111111111/examen.png',1);

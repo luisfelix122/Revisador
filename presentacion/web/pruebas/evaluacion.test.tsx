@@ -35,7 +35,7 @@ prueba("no permite avanzar sin solución", async () => {
 });
 
 prueba("habilita el análisis después de cerrar la recepción con exámenes recibidos", async () => {
-  const datos = {id:'pc',titulo:'PC',estado:'borrador',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[{id:'s'}],materiales_apoyo:[],examenes_estudiantes:[{id:'e',estado_revision:'pendiente',detalles_preguntas:[]}],recepcion_abierta:true};
+  const datos = {id:'pc',titulo:'PC',estado:'borrador',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[{id:'s'}],materiales_apoyo:[],examenes_estudiantes:[{id:'e',estado_revision:'pendiente',detalles_preguntas:[]}],recepcion_abierta:true,recepcion_iniciada:true};
   const servicio = {evaluacion:async()=>({...datos}), configurarRecepcion:async()=>{datos.recepcion_abierta=false}} as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
   await pantalla.findByRole('heading',{name:'PC'});
@@ -48,20 +48,20 @@ prueba("habilita el análisis después de cerrar la recepción con exámenes rec
 });
 
 prueba("en carga manual el docente confirma que terminó antes de analizar", async () => {
-  const datos = {id:'pc',titulo:'PC',estado:'borrador',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[{id:'s'}],materiales_apoyo:[],examenes_estudiantes:[{id:'e',estado_revision:'pendiente',detalles_preguntas:[]}],recepcion_abierta:false};
-  const servicio = {evaluacion:async()=>datos} as unknown as ServicioBiblioteca;
+  const datos = {id:'pc',titulo:'PC',estado:'borrador',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[{id:'s'}],materiales_apoyo:[],examenes_estudiantes:[{id:'e',estado_revision:'pendiente',detalles_preguntas:[]}],recepcion_abierta:false,modalidad_recepcion:'manual',carga_manual_finalizada:false};
+  const servicio = {evaluacion:async()=>datos, configurarModalidad:async(_id:string,_modo:string,finalizada:boolean)=>{datos.carga_manual_finalizada=finalizada}} as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
   await pantalla.findByRole('heading',{name:'PC'});
   disparar.click(pantalla.getByRole('button',{name:'Carga manual del docente'}));
   disparar.click(pantalla.getByRole('checkbox',{name:/Autorizo una llamada de IA/}));
   esperar(pantalla.getByRole('button',{name:'Analizar solución con IA'})).toBeDisabled();
   disparar.click(pantalla.getByRole('checkbox',{name:/Terminé de cargar los exámenes/}));
-  esperar(pantalla.getByRole('button',{name:'Analizar solución con IA'})).toBeEnabled();
+  await esperarQue(() => esperar(pantalla.getByRole('button',{name:'Analizar solución con IA'})).toBeEnabled());
   esperar(pantalla.queryByLabelText('Exámenes de estudiantes')).not.toBeInTheDocument();
 });
 
 prueba("permite analizar al vencer el plazo aunque no se hayan recibido exámenes", async () => {
-  const datos = {id:'pc',titulo:'PC',estado:'borrador',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[{id:'s'}],materiales_apoyo:[],examenes_estudiantes:[],recepcion_abierta:true,fecha_cierre_programada:'2020-01-01T00:00:00Z'};
+  const datos = {id:'pc',titulo:'PC',estado:'borrador',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[{id:'s'}],materiales_apoyo:[],examenes_estudiantes:[],recepcion_abierta:true,recepcion_iniciada:true,fecha_cierre_programada:'2020-01-01T00:00:00Z'};
   const servicio = {evaluacion:async()=>datos} as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
   await pantalla.findByRole('heading',{name:'PC'});
@@ -129,7 +129,7 @@ prueba("permite corregir una respuesta detectada al revisar un examen", async ()
 
 prueba("no envía exámenes si cambia la configuración después de preparar", async () => {
   guardarCredenciales({proveedor:"gemini",clave:"clave-a",modelo:"modelo-a"}, false);
-  const evaluacion = {id:"evaluacion",titulo:"Parcial",cursos:{nombre:"Álgebra"},puntaje_total_maximo:20,indicaciones_profesor:"",criterios_preguntas:[{numero_pregunta:1,puntaje_maximo:20,respuesta_esperada:"Respuesta"}],soluciones_profesor:[{ruta_almacenamiento:"solucion"}],materiales_apoyo:[],examenes_estudiantes:[{id:"examen",estado_revision:"pendiente"}]};
+  const evaluacion = {id:"evaluacion",titulo:"Parcial",cursos:{nombre:"Álgebra"},puntaje_total_maximo:20,indicaciones_profesor:"",modalidad_recepcion:'manual',carga_manual_finalizada:true,criterios_preguntas:[{numero_pregunta:1,puntaje_maximo:20,respuesta_esperada:"Respuesta"}],soluciones_profesor:[{ruta_almacenamiento:"solucion"}],materiales_apoyo:[],examenes_estudiantes:[{id:"examen",estado_revision:"pendiente"}]};
   const peticion = simular.spyOn(globalThis,"fetch").mockImplementation(async (entrada) => {
     const ruta=String(entrada);
     return new Response(JSON.stringify(ruta.endsWith('/preparar') ? {examenes:1,huella:"a".repeat(64)} : evaluacion),{status:200});
@@ -178,7 +178,7 @@ prueba("añade una pregunta sin repetir números existentes en la rúbrica", asy
 
 prueba("prepara y califica solo después de la autorización sin pedir tarifas", async () => {
   guardarCredenciales({proveedor:"gemini",clave:"clave-prueba",modelo:"modelo-prueba"}, false);
-  const evaluacion = {id:"pc",titulo:"PC",cursos:{nombre:"Curso"},puntaje_total_maximo:20,indicaciones_profesor:"",criterios_preguntas:[{numero_pregunta:1,puntaje_maximo:20,respuesta_esperada:"A"}],soluciones_profesor:[{id:"s"}],materiales_apoyo:[],examenes_estudiantes:[{id:"e",estado_revision:"pendiente",detalles_preguntas:[]}]};
+  const evaluacion = {id:"pc",titulo:"PC",cursos:{nombre:"Curso"},puntaje_total_maximo:20,indicaciones_profesor:"",modalidad_recepcion:'manual',carga_manual_finalizada:true,criterios_preguntas:[{numero_pregunta:1,puntaje_maximo:20,respuesta_esperada:"A"}],soluciones_profesor:[{id:"s"}],materiales_apoyo:[],examenes_estudiantes:[{id:"e",estado_revision:"pendiente",detalles_preguntas:[]}]};
   const datos = simular.fn(async (ruta: string) => ruta.endsWith('/preparar') ? {examenes:1,huella:'a'.repeat(64)} : {guardado:true});
   const servicio = {evaluacion:async()=>evaluacion,datos} as unknown as ServicioBiblioteca;
   try {
@@ -197,3 +197,24 @@ prueba("prepara y califica solo después de la autorización sin pedir tarifas",
   } finally { sessionStorage.clear(); }
 });
 
+
+prueba("el cambio de pestaña no confirma una carga manual incompleta", async () => {
+  const datos = {id:'pc',titulo:'PC',estado:'borrador',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[{id:'s'}],materiales_apoyo:[],examenes_estudiantes:[{id:'e',estado_revision:'pendiente',detalles_preguntas:[]}],recepcion_abierta:false,modalidad_recepcion:'manual',recepcion_iniciada:false,carga_manual_finalizada:false};
+  const servicio = {evaluacion:async()=>({...datos}), configurarModalidad:simular.fn().mockRejectedValue(new Error('Confirma que terminaste la carga manual antes de cambiar de modalidad.'))} as unknown as ServicioBiblioteca;
+  representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
+  await pantalla.findByRole('heading',{name:'PC'});
+  disparar.click(pantalla.getByRole('checkbox',{name:/Autorizo una llamada de IA/}));
+  disparar.click(pantalla.getByRole('button',{name:'Enlace para alumnos'}));
+  esperar(await pantalla.findByRole('alert')).toHaveTextContent('Confirma que terminaste la carga manual');
+  esperar(pantalla.getByRole('button',{name:'Analizar solución con IA'})).toBeDisabled();
+});
+
+prueba("recuerda la confirmación manual al volver a abrir una evaluación", async () => {
+  const datos = {id:'pc',titulo:'PC',estado:'borrador',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[{id:'s'}],materiales_apoyo:[],examenes_estudiantes:[{id:'e',estado_revision:'pendiente',detalles_preguntas:[]}],recepcion_abierta:false,modalidad_recepcion:'manual',recepcion_iniciada:false,carga_manual_finalizada:true};
+  const servicio = {evaluacion:async()=>({...datos})} as unknown as ServicioBiblioteca;
+  representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
+  await pantalla.findByRole('heading',{name:'PC'});
+  esperar(pantalla.getByRole('checkbox',{name:/Terminé de cargar los exámenes/})).toBeChecked();
+  disparar.click(pantalla.getByRole('checkbox',{name:/Autorizo una llamada de IA/}));
+  esperar(pantalla.getByRole('button',{name:'Analizar solución con IA'})).toBeEnabled();
+});

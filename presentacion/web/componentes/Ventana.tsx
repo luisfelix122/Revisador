@@ -8,10 +8,12 @@ import { X as Cerrar } from "lucide-react";
 export function Ventana({
   titulo,
   cerrar,
+  amplia = false,
   children: contenido,
 }: {
   titulo: string;
   cerrar: () => void;
+  amplia?: boolean;
   children: Contenido;
 }) {
   const panel = usarReferencia<HTMLDivElement>(null);
@@ -59,7 +61,7 @@ export function Ventana({
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
-        className="ventana"
+        className={`ventana ${amplia ? "ventana-amplia" : ""}`}
       >
         <div className="cabecera-ventana">
           <h2>{titulo}</h2>

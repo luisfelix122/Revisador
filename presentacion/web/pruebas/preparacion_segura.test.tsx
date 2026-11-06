@@ -6,7 +6,7 @@ import type { ServicioBiblioteca } from "../servicios/biblioteca";
 
 prueba("descarta autorización anterior si falla una nueva preparación", async () => {
   guardarCredenciales({proveedor:"gemini",clave:"clave",modelo:"modelo"}, false);
-  const evaluacion={id:"pc",titulo:"PC",cursos:{nombre:"Curso"},puntaje_total_maximo:20,criterios_preguntas:[{numero_pregunta:1,puntaje_maximo:20,respuesta_esperada:"A"}],soluciones_profesor:[{id:"s"}],materiales_apoyo:[],examenes_estudiantes:[{id:"e",estado_revision:"pendiente",detalles_preguntas:[]}]};
+  const evaluacion={id:"pc",titulo:"PC",cursos:{nombre:"Curso"},puntaje_total_maximo:20,modalidad_recepcion:'alumnos',recepcion_iniciada:true,recepcion_abierta:false,criterios_preguntas:[{numero_pregunta:1,puntaje_maximo:20,respuesta_esperada:"A"}],soluciones_profesor:[{id:"s"}],materiales_apoyo:[],examenes_estudiantes:[{id:"e",estado_revision:"pendiente",detalles_preguntas:[]}]};
   const datos=simular.fn().mockResolvedValueOnce({examenes:1,huella:'a'.repeat(64)}).mockRejectedValueOnce(new Error('No se pudo preparar'));
   const servicio={evaluacion:async()=>evaluacion,datos} as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
@@ -21,7 +21,7 @@ prueba("descarta autorización anterior si falla una nueva preparación", async 
 
 prueba("la revisión desde recepción requiere autorización antes de enviar exámenes", async () => {
   guardarCredenciales({proveedor:"gemini",clave:"clave",modelo:"modelo"}, false);
-  const evaluacion={id:"pc",titulo:"PC",cursos:{nombre:"Curso"},puntaje_total_maximo:20,criterios_preguntas:[{numero_pregunta:1,puntaje_maximo:20,respuesta_esperada:"A"}],soluciones_profesor:[{id:"s"}],materiales_apoyo:[],examenes_estudiantes:[{id:"e",nombre_estudiante:"Ana",codigo_estudiante:"1",estado_revision:"pendiente",detalles_preguntas:[]}]};
+  const evaluacion={id:"pc",titulo:"PC",cursos:{nombre:"Curso"},puntaje_total_maximo:20,modalidad_recepcion:'alumnos',recepcion_iniciada:true,recepcion_abierta:false,criterios_preguntas:[{numero_pregunta:1,puntaje_maximo:20,respuesta_esperada:"A"}],soluciones_profesor:[{id:"s"}],materiales_apoyo:[],examenes_estudiantes:[{id:"e",nombre_estudiante:"Ana",codigo_estudiante:"1",estado_revision:"pendiente",detalles_preguntas:[]}]};
   const datos=simular.fn().mockResolvedValue({examenes:1,huella:'a'.repeat(64)});
   const servicio={evaluacion:async()=>evaluacion,datos} as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);

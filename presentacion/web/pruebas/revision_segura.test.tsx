@@ -14,3 +14,11 @@ prueba("al marcar respuesta como nada muestra puntaje cero antes de guardar", as
   esperar(pantalla.getByText("Las respuestas sin contestar reciben cero puntos.")).toBeInTheDocument();
   esperar(pantalla.getByText("Total: 0.00")).toBeInTheDocument();
 });
+
+prueba("muestra un PDF entregado en el visor de revisión", async () => {
+  const examen = {id:'examen',nombre_estudiante:'Ana',codigo_estudiante:'01',nota_final:10,estado_revision:'completado',observaciones_generales:'',ruta_imagen_examen:'estudiantes/e/examen.pdf',detalles_preguntas:[{numero_pregunta:1,puntaje_obtenido:10,puntaje_maximo:20,respuesta_detectada:'A',justificacion:'Bien'}]};
+  const servicio = {evaluacion:async()=>({id:'pc',titulo:'PC',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[],materiales_apoyo:[],examenes_estudiantes:[examen]}),obtenerArchivoExamenUrl:async()=> 'blob:pdf-prueba'} as unknown as ServicioBiblioteca;
+  representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={false} alVolver={()=>{}} />);
+  disparar.click(await pantalla.findByRole('button',{name:'Revisar preguntas'}));
+  esperar(await pantalla.findByTitle('PDF del examen de Ana')).toHaveAttribute('src','blob:pdf-prueba');
+});

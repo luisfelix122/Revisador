@@ -178,3 +178,18 @@ def test_alumno_existente_reenvio_no_bloqueado_por_aforo():
         ahora=ahora
     ) == 2
 
+
+
+def test_solo_da_por_terminada_la_recepcion_si_fue_abierta_o_se_confirmo_la_carga():
+    from dominio.recepcion import recepcion_finalizada
+    alumnos = {'modalidad_recepcion':'alumnos','recepcion_iniciada':False,'recepcion_abierta':False,'examenes_estudiantes':[{'id':'manual'}]}
+    assert recepcion_finalizada(alumnos) is False
+    alumnos['recepcion_iniciada'] = True
+    assert recepcion_finalizada(alumnos) is True
+    alumnos.update(recepcion_abierta=True,cantidad_estudiantes_esperados=2)
+    assert recepcion_finalizada(alumnos) is False
+    alumnos['examenes_estudiantes'].append({'id':'otro'})
+    assert recepcion_finalizada(alumnos) is True
+    alumnos.update(cantidad_estudiantes_esperados=10,fecha_cierre_programada='2020-01-01T00:00:00Z')
+    assert recepcion_finalizada(alumnos) is True
+    assert recepcion_finalizada({'modalidad_recepcion':'manual','carga_manual_finalizada':True,'examenes_estudiantes':[]}) is False

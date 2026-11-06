@@ -709,6 +709,7 @@ h1 {
   box-shadow: 0 12px 40px #20212433;
   animation: abrir-ventana 180ms ease-out;
 }
+.ventana.ventana-amplia { width: 1100px; }
 .cabecera-ventana {
   display: flex;
   justify-content: space-between;
@@ -1615,6 +1616,9 @@ input[type="checkbox"] {
   align-items: center;
   justify-content: center;
 }
+.visor-pdf { width: 100%; height: 100%; min-height: 360px; border: 0; background: #fff; }
+.visor-contenedor-pdf { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 8px; }
+.visor-contenedor-pdf a { color: #185abc; font-size: 12px; }
 .visor-mensaje {
   font-size: 13px;
   color: #5f6368;

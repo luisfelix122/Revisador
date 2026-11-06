@@ -3,6 +3,24 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 
+def recepcion_finalizada(evaluacion: dict, ahora: datetime | None = None) -> bool:
+    examenes = evaluacion.get('examenes_estudiantes') or []
+    if evaluacion.get('modalidad_recepcion') == 'manual':
+        return bool(examenes and evaluacion.get('carga_manual_finalizada'))
+    if not evaluacion.get('recepcion_iniciada'):
+        return False
+    cupo = evaluacion.get('cantidad_estudiantes_esperados')
+    cierre = evaluacion.get('fecha_cierre_programada')
+    vencida = False
+    if cierre:
+        try:
+            fecha = datetime.fromisoformat(str(cierre).replace('Z', '+00:00'))
+            vencida = fecha.tzinfo is not None and fecha <= (ahora or datetime.now(timezone.utc))
+        except (ValueError, TypeError):
+            vencida = False
+    return bool(not evaluacion.get('recepcion_abierta') or vencida or (cupo and len(examenes) >= cupo))
+
+
 class ErrorEntregaCerrada(Exception):
     """Lanzada cuando el plazo de entrega está cerrado o expiró."""
     pass

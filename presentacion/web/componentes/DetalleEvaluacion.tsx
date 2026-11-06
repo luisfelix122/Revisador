@@ -68,9 +68,9 @@ export function DetalleEvaluacion({
     [busqueda, buscar] = usarEstado(""),
     [filtro, filtrar] = usarEstado("todos"),
     [paso, cambiarPaso] = usarEstado<1 | 2 | 3>(1),
-    [modoEntrega, cambiarModoEntrega] = usarEstado<"alumnos" | "manual">("alumnos"),
-    [manualFinalizada, marcarManualFinalizada] = usarEstado(false),
     [revisando, revisar] = usarEstado<Examen | null>(null);
+  const modoEntrega = evaluacion?.modalidad_recepcion ?? "alumnos";
+  const manualFinalizada = evaluacion?.carga_manual_finalizada ?? false;
   const detener = usarReferencia(false);
   const pasoInicializado = usarReferencia(false);
   const examenesPreparados = usarReferencia<Examen[] | null>(null);
@@ -116,9 +116,24 @@ export function DetalleEvaluacion({
       tiempo_limite_minutos: datos.tiempo_limite_minutos,
       cantidad_estudiantes_esperados: datos.cantidad_estudiantes_esperados,
       permitir_reenvios_global: datos.permitir_reenvios_global,
+      modalidad_recepcion: datos.modalidad_recepcion,
+      recepcion_iniciada: datos.recepcion_iniciada,
+      carga_manual_finalizada: datos.carga_manual_finalizada,
       examenes_estudiantes: (datos.examenes_estudiantes || []).map((examen) => ({...examen, detalles_preguntas: examen.detalles_preguntas || []})),
     } : actual);
   }, [identificador, servicio]);
+  const actualizarModalidad = async (modalidad: "alumnos" | "manual", finalizada?: boolean) => {
+    ocupar(true);
+    mostrarError("");
+    try {
+      await servicio.configurarModalidad(identificador, modalidad, finalizada);
+      await actualizarRecepcion();
+    } catch (problema) {
+      mostrarError(mensaje(problema));
+    } finally {
+      ocupar(false);
+    }
+  };
   usarEfecto(() => {
     if (paso !== 2 || modoEntrega !== 'alumnos' || !evaluacion?.recepcion_abierta) return;
     const intervalo = window.setInterval(() => void actualizarRecepcion().catch(() => {}), 10000);
@@ -415,7 +430,7 @@ export function DetalleEvaluacion({
   const plazoVencido = Boolean(evaluacion.fecha_cierre_programada && Date.parse(evaluacion.fecha_cierre_programada) <= Date.now());
   const recepcionTerminada = modoEntrega === 'manual'
     ? evaluacion.examenes_estudiantes.length > 0 && manualFinalizada
-    : plazoVencido || cupoCompleto || (!evaluacion.recepcion_abierta && evaluacion.examenes_estudiantes.length > 0);
+    : Boolean(evaluacion.recepcion_iniciada && (plazoVencido || cupoCompleto || !evaluacion.recepcion_abierta));
   const puedeRevisar = completados.length > 0 || (guardada && recepcionTerminada && evaluacion.examenes_estudiantes.length > 0);
 
   return (
@@ -539,8 +554,8 @@ export function DetalleEvaluacion({
           <h3>Recepción de exámenes</h3>
           <p>Elige cómo recibirá el docente los exámenes de esta evaluación.</p>
           <div className="pestanas-modalidad">
-            <button type="button" className={`pestana-boton ${modoEntrega === "alumnos" ? "activa" : ""}`} onClick={() => cambiarModoEntrega("alumnos")}>Enlace para alumnos</button>
-            <button type="button" className={`pestana-boton ${modoEntrega === "manual" ? "activa" : ""}`} onClick={() => cambiarModoEntrega("manual")}>Carga manual del docente</button>
+            <button type="button" className={`pestana-boton ${modoEntrega === "alumnos" ? "activa" : ""}`} disabled={ocupado || corriendo} onClick={() => { if (modoEntrega !== "alumnos") void actualizarModalidad("alumnos"); }}>Enlace para alumnos</button>
+            <button type="button" className={`pestana-boton ${modoEntrega === "manual" ? "activa" : ""}`} disabled={ocupado || corriendo} onClick={() => { if (modoEntrega !== "manual") void actualizarModalidad("manual"); }}>Carga manual del docente</button>
           </div>
           {modoEntrega === "alumnos" ? (
             <RecepcionAlumnos vista="recepcion" evaluacion={evaluacion} servicio={servicio} apiVerificada={apiVerificada} alActualizar={actualizarRecepcion} alRevisarExamen={(examen) => revisar(examen)} alCalificarLote={alCalificarLote} ocupado={ocupado} corriendo={corriendo} />
@@ -563,7 +578,7 @@ export function DetalleEvaluacion({
               {evaluacion.examenes_estudiantes.length}/100 exámenes guardados
             </span>
           </label>
-              <label className="casilla"><input type="checkbox" checked={manualFinalizada} disabled={!evaluacion.examenes_estudiantes.length || ocupado} onChange={(evento) => marcarManualFinalizada(evento.target.checked)} />Terminé de cargar los exámenes</label>
+              <label className="casilla"><input type="checkbox" checked={manualFinalizada} disabled={!evaluacion.examenes_estudiantes.length || ocupado} onChange={(evento) => void actualizarModalidad("manual", evento.target.checked)} />Terminé de cargar los exámenes</label>
             </div>
           )}
           {!recepcionTerminada && <p className="ayuda-campo">Para analizar la solución, termina la carga manual o espera a que se complete el aforo o se cierre la recepción.</p>}
@@ -996,6 +1011,7 @@ function RevisionExamen({
 
   usarEfecto(() => {
     let activo = true;
+    let urlCreada: string | null = null;
     if (!rutaActiva) {
       cambiarImagenUrl(null);
       return;
@@ -1004,7 +1020,8 @@ function RevisionExamen({
     servicio
       .obtenerArchivoExamenUrl(evaluacionId, examen.id, rutaActiva)
       .then((url) => {
-        if (activo) cambiarImagenUrl(url);
+        if (activo) { urlCreada = url; cambiarImagenUrl(url); }
+        else URL.revokeObjectURL?.(url);
       })
       .catch(() => {
         if (activo) cambiarImagenUrl(null);
@@ -1014,6 +1031,7 @@ function RevisionExamen({
       });
     return () => {
       activo = false;
+      if (urlCreada) URL.revokeObjectURL?.(urlCreada);
     };
   }, [evaluacionId, examen.id, rutaActiva, servicio]);
 
@@ -1052,7 +1070,7 @@ function RevisionExamen({
   };
 
   return (
-    <Ventana titulo={`Revisión de examen · ${codigo || "Estudiante"}`} cerrar={cerrar}>
+    <Ventana titulo={`Revisión de examen · ${codigo || "Estudiante"}`} cerrar={cerrar} amplia>
       <div className="revision-contenedor-dividido">
         {/* Columna Visor de Examen */}
         <section className="visor-columna" aria-label="Visor de examen del estudiante">
@@ -1062,7 +1080,7 @@ function RevisionExamen({
                 ? `Entrega activa #${examen.numero_entregas}`
                 : "Examen entregado"}
             </span>
-            <div className="visor-botones">
+            {!rutaActiva.toLowerCase().endsWith('.pdf') && <div className="visor-botones">
               <button
                 type="button"
                 className="boton-icono pequeno"
@@ -1093,7 +1111,7 @@ function RevisionExamen({
               >
                 <AcercarIcon size={16} />
               </button>
-            </div>
+            </div>}
           </div>
 
           {historial.length > 1 && (
@@ -1120,6 +1138,8 @@ function RevisionExamen({
           <div className="visor-lienzo">
             {cargandoImagen ? (
               <p className="visor-mensaje" role="status">Cargando archivo de examen…</p>
+            ) : imagenUrl && rutaActiva.toLowerCase().endsWith('.pdf') ? (
+              <div className="visor-contenedor-pdf"><iframe title={`PDF del examen de ${nombre}`} src={imagenUrl} className="visor-pdf" /><a href={imagenUrl} target="_blank" rel="noopener noreferrer">Abrir PDF en otra pestaña</a></div>
             ) : imagenUrl ? (
               <div className="visor-marco-imagen">
                 <img

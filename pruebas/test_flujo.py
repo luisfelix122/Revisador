@@ -241,7 +241,7 @@ def test_analisis_con_salida_invalida_muestra_error_de_ia_sin_filtrar_datos(monk
         if url.endswith('/auth/v1/user'):
             return httpx.Response(200,json={'id':'11111111-1111-4111-8111-111111111111'})
         if '/rest/v1/evaluaciones?' in url:
-            return httpx.Response(200,json=[{'puntaje_total_maximo':20,'soluciones_profesor':[],'materiales_apoyo':[],'criterios_preguntas':[],'examenes_estudiantes':[]}])
+            return httpx.Response(200,json=[{'puntaje_total_maximo':20,'modalidad_recepcion':'alumnos','recepcion_iniciada':True,'recepcion_abierta':False,'soluciones_profesor':[],'materiales_apoyo':[],'criterios_preguntas':[],'examenes_estudiantes':[]}])
         raise AssertionError(url)
     async def contexto(*args): return []
     async def generar(*args): return {'error':'contenido-privado'}

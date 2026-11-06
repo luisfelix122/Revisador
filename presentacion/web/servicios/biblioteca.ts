@@ -86,6 +86,11 @@ export class ServicioBiblioteca {
       }),
     });
   }
+  configurarModalidad(evaluacionId: string, modalidad: "alumnos" | "manual", finalizada?: boolean) {
+    return this.datos(`/evaluaciones/${evaluacionId}/recepcion/modalidad`, {
+      method: "PUT", body: JSON.stringify({ modalidad, finalizada: finalizada ?? null }),
+    });
+  }
   permitirReenvioAlumno(evaluacionId: string, examenId: string, permitir: boolean) {
     return this.datos(`/evaluaciones/${evaluacionId}/examenes/${examenId}/permitir-reenvio`, {
       method: "PUT",
@@ -156,6 +161,9 @@ export interface EvaluacionDetalle {
   indicaciones_profesor: string;
   puntaje_total_maximo: number;
   estado: string;
+  modalidad_recepcion?: "alumnos" | "manual";
+  recepcion_iniciada?: boolean;
+  carga_manual_finalizada?: boolean;
   token_recepcion?: string;
   recepcion_abierta?: boolean;
   tiempo_limite_minutos?: number | null;
