@@ -1699,6 +1699,37 @@ input[type="checkbox"] {
 .cuerpo-acceso .acceso > h1 { font-size: 28px; line-height: 1.25; letter-spacing: -.025em; }
 .cuerpo-acceso .acceso input { min-height: 46px; }
 .cuerpo-acceso .acceso .boton-primario { min-height: 46px; }
+/* Pantallas de escritorio bajas: conservar ambos paneles visibles sin recortar el contenido. */
+@media (min-width: 761px) and (max-height: 850px) {
+  .carrusel-acceso { padding-block: 20px; }
+  .carrusel-introduccion h2 { margin: 10px 0 8px; font-size: clamp(28px, 2.5vw, 36px); }
+  .carrusel-introduccion > p { line-height: 1.45; }
+  .carrusel-muestra { margin: 16px 0; }
+  .muestra-barra { height: 30px; }
+  .muestra-cabecera { padding-block: 12px 8px; }
+  .muestra-icono { width: 38px; height: 38px; }
+  .muestra-filas { padding-bottom: 6px; }
+  .muestra-fila { min-height: 45px; }
+  .muestra-pie { padding-block: 7px; }
+  .carrusel-detalle { min-height: 70px; }
+  .carrusel-detalle h3 { margin-bottom: 5px; font-size: 19px; }
+  .carrusel-detalle p { line-height: 1.5; }
+  .carrusel-controles { margin-top: 8px; }
+  .cuerpo-acceso .acceso { margin-block: 24px; }
+}
+@media (min-width: 761px) and (max-height: 680px) {
+  .carrusel-acceso { padding-block: 12px; }
+  .carrusel-introduccion h2 { margin-block: 6px; font-size: 28px; }
+  .carrusel-muestra { margin-block: 10px; }
+  .muestra-cabecera { padding-block: 8px 4px; }
+  .muestra-fila { min-height: 40px; }
+  .muestra-pie { padding-block: 5px; }
+  .carrusel-detalle { min-height: 60px; }
+  .carrusel-controles { margin-top: 4px; }
+  .cuerpo-acceso .acceso { margin-block: 16px; }
+  .cuerpo-acceso .acceso form { margin-top: 18px; }
+  .cuerpo-acceso .acceso label { margin-block: 12px; }
+}
 @media (max-width: 760px) {
   .barra-acceso { padding: 0 22px; }
   .cuerpo-acceso { display: flex; flex-direction: column; }
