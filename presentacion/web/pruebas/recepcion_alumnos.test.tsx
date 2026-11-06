@@ -9,6 +9,51 @@ antesDeCada(() => {
   espia.restoreAllMocks();
 });
 
+prueba('la revisión indica aprobación usando el mínimo configurado', () => {
+  const evaluacion = {id:'pc', titulo:'Examen', indicaciones_profesor:'', puntaje_total_maximo:100, puntaje_aprobatorio:50, estado:'calificado', criterios_preguntas:[], soluciones_profesor:[], materiales_apoyo:[], cursos:{id:'c',nombre:'Curso',evaluaciones:[]}, examenes_estudiantes:[
+    {id:'a',nombre_estudiante:'Ana',codigo_estudiante:'1',nota_final:40,estado_revision:'completado',observaciones_generales:'',revisado_por_profesor:false,detalles_preguntas:[]},
+    {id:'b',nombre_estudiante:'Luis',codigo_estudiante:'2',nota_final:60,estado_revision:'completado',observaciones_generales:'',revisado_por_profesor:false,detalles_preguntas:[]},
+  ]} as EvaluacionDetalle;
+  representar(<RecepcionAlumnos vista="revision" evaluacion={evaluacion} servicio={{} as ServicioBiblioteca} apiVerificada={false} alActualizar={async()=>{}} alRevisarExamen={()=>{}} alCalificarLote={async()=>{}} ocupado={false} corriendo={false} />);
+  esperar(pantalla.getByText('Desaprobado')).toBeInTheDocument();
+  esperar(pantalla.getByText('Aprobado')).toBeInTheDocument();
+});
+
+prueba('al reabrir se conserva el tiempo configurado y se rechazan minutos inválidos', async () => {
+  const evaluacion = {id:'pc', titulo:'Examen', indicaciones_profesor:'', puntaje_total_maximo:20, estado:'borrador', criterios_preguntas:[], soluciones_profesor:[], materiales_apoyo:[], cursos:{id:'c',nombre:'Curso',evaluaciones:[]}, recepcion_abierta:false, tiempo_limite_minutos:90, examenes_estudiantes:[]} as EvaluacionDetalle;
+  const configurar = espia.fn().mockResolvedValue({});
+  representar(<RecepcionAlumnos evaluacion={evaluacion} servicio={{configurarRecepcion:configurar} as unknown as ServicioBiblioteca} apiVerificada={false} alActualizar={async()=>{}} alRevisarExamen={()=>{}} alCalificarLote={async()=>{}} ocupado={false} corriendo={false} />);
+  const minutos = pantalla.getByLabelText(/Por \(min\)/i);
+  esperar(minutos).toHaveValue(90);
+  disparar.change(minutos,{target:{value:'1.5'}});
+  disparar.click(pantalla.getByRole('button',{name:/Reabrir entregas/i}));
+  esperar(await pantalla.findByText(/minutos.*entero/i)).toBeInTheDocument();
+  esperar(configurar).not.toHaveBeenCalled();
+  disparar.change(minutos,{target:{value:'90'}});
+  disparar.click(pantalla.getByRole('button',{name:/Reabrir entregas/i}));
+  await esperarQue(()=>esperar(configurar).toHaveBeenCalledWith('pc',true,90,false,null));
+});
+
+prueba('el aforo rechaza decimales en vez de redondearlos silenciosamente', async () => {
+  const evaluacion = {id:'pc', titulo:'Examen', indicaciones_profesor:'', puntaje_total_maximo:20, estado:'borrador', criterios_preguntas:[], soluciones_profesor:[], materiales_apoyo:[], cursos:{id:'c',nombre:'Curso',evaluaciones:[]}, recepcion_abierta:false, examenes_estudiantes:[]} as EvaluacionDetalle;
+  const configurar=espia.fn().mockResolvedValue({});
+  representar(<RecepcionAlumnos evaluacion={evaluacion} servicio={{configurarRecepcion:configurar} as unknown as ServicioBiblioteca} apiVerificada={false} alActualizar={async()=>{}} alRevisarExamen={()=>{}} alCalificarLote={async()=>{}} ocupado={false} corriendo={false} />);
+  const aforo=pantalla.getByLabelText('Cantidad de alumnos en aula');
+  disparar.change(aforo,{target:{value:'12.5'}});
+  disparar.submit(aforo.closest('form')!);
+  esperar(await pantalla.findByText(/aforo.*entero/i)).toBeInTheDocument();
+  esperar(configurar).not.toHaveBeenCalled();
+});
+
+prueba('una recepción sin plazo puede reabrirse sin agregarle tiempo', async () => {
+  const evaluacion = {id:'pc',titulo:'Examen',indicaciones_profesor:'',puntaje_total_maximo:20,estado:'borrador',criterios_preguntas:[],soluciones_profesor:[],materiales_apoyo:[],cursos:{id:'c',nombre:'Curso',evaluaciones:[]},recepcion_abierta:false,tiempo_limite_minutos:null,examenes_estudiantes:[]} as EvaluacionDetalle;
+  const configurar=espia.fn().mockResolvedValue({});
+  representar(<RecepcionAlumnos evaluacion={evaluacion} servicio={{configurarRecepcion:configurar} as unknown as ServicioBiblioteca} apiVerificada={false} alActualizar={async()=>{}} alRevisarExamen={()=>{}} alCalificarLote={async()=>{}} ocupado={false} corriendo={false} />);
+  esperar(pantalla.getByLabelText(/Por \(min\)/i)).toHaveValue(null);
+  disparar.click(pantalla.getByRole('button',{name:/Reabrir entregas/i}));
+  await esperarQue(()=>esperar(configurar).toHaveBeenCalledWith('pc',true,null,false,null));
+});
+
 prueba("el alumno ve el tiempo restante de la recepción", async () => {
   const ahora = Date.parse('2026-11-05T12:00:00Z');
   espia.spyOn(Date, 'now').mockReturnValue(ahora);
@@ -227,7 +272,7 @@ prueba("RecepcionAlumnos panel docente permite cerrar entregas y copiar enlace",
   // Probar cerrar entregas
   const botonCerrar = pantalla.getByRole("button", { name: /Cerrar entregas ahora/i });
   disparar.click(botonCerrar);
-  esperar(servicioMock.configurarRecepcion).toHaveBeenCalledWith("eval-docente-1", false, null, false, null);
+  esperar(servicioMock.configurarRecepcion).toHaveBeenCalledWith("eval-docente-1", false, 30, false, null);
 
   // Probar filtro por lotes
   const botonRevisarPendientes = pantalla.getByRole("button", { name: /Revisar solo pendientes/i });

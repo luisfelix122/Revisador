@@ -31,6 +31,8 @@ interface Propiedades {
   vista?: "completa" | "recepcion" | "revision";
 }
 
+const mostrarMinutos = (minutos: number | null | undefined) => minutos === null ? "" : String(minutos ?? 30);
+
 export function RecepcionAlumnos({
   evaluacion,
   servicio,
@@ -44,7 +46,7 @@ export function RecepcionAlumnos({
 }: Propiedades) {
   const [copiado, cambiarCopiado] = usarEstado(false);
   const [copiadoMensaje, cambiarCopiadoMensaje] = usarEstado(false);
-  const [minutosCierre, cambiarMinutosCierre] = usarEstado("30");
+  const [minutosCierre, cambiarMinutosCierre] = usarEstado(mostrarMinutos(evaluacion.tiempo_limite_minutos));
   const [cupoEstudiantes, cambiarCupoEstudiantes] = usarEstado(
     evaluacion.cantidad_estudiantes_esperados ? String(evaluacion.cantidad_estudiantes_esperados) : ""
   );
@@ -58,6 +60,10 @@ export function RecepcionAlumnos({
       evaluacion.cantidad_estudiantes_esperados ? String(evaluacion.cantidad_estudiantes_esperados) : ""
     );
   }, [evaluacion.cantidad_estudiantes_esperados]);
+
+  usarEfecto(() => {
+    cambiarMinutosCierre(mostrarMinutos(evaluacion.tiempo_limite_minutos));
+  }, [evaluacion.id, evaluacion.tiempo_limite_minutos]);
 
   const urlEntrega = typeof window !== "undefined"
     ? `${window.location.origin}/?entrega=${evaluacion.token_recepcion || evaluacion.id}`
@@ -89,7 +95,11 @@ export function RecepcionAlumnos({
     mostrarErrorLocal("");
     avisarExito("");
     try {
-      const tiempo = abrir && Number(minutosCierre) > 0 ? Number(minutosCierre) : null;
+      const tiempo = abrir ? (minutosCierre.trim() !== "" ? Number(minutosCierre) : null) : (evaluacion.tiempo_limite_minutos ?? null);
+      if (abrir && tiempo !== null && (!Number.isSafeInteger(tiempo) || tiempo < 1 || tiempo > 300)) {
+        mostrarErrorLocal("Los minutos deben ser un número entero entre 1 y 300, o dejarse vacíos para no fijar un plazo.");
+        return;
+      }
       await servicio.configurarRecepcion(
         evaluacion.id,
         abrir,
@@ -133,10 +143,9 @@ export function RecepcionAlumnos({
     mostrarErrorLocal("");
     avisarExito("");
     try {
-      const valor = cupoEstudiantes.trim() === "" ? null : parseInt(cupoEstudiantes, 10);
-      if (valor !== null && (isNaN(valor) || valor <= 0)) {
-        mostrarErrorLocal("El aforo de alumnos debe ser un número entero positivo.");
-        cambiarAccionEnCurso(false);
+      const valor = cupoEstudiantes.trim() === "" ? null : Number(cupoEstudiantes);
+      if (valor !== null && (!Number.isSafeInteger(valor) || valor < 1 || valor > 1000)) {
+        mostrarErrorLocal("El aforo de alumnos debe ser un número entero entre 1 y 1000.");
         return;
       }
       await servicio.configurarRecepcion(
@@ -188,6 +197,7 @@ export function RecepcionAlumnos({
   };
 
   const totalEntregados = evaluacion.examenes_estudiantes.length;
+  const minimoAprobatorio = Number(evaluacion.puntaje_aprobatorio ?? Math.round(Number(evaluacion.puntaje_total_maximo) * 52.5) / 100);
   const totalCompletados = evaluacion.examenes_estudiantes.filter((e) => e.estado_revision === "completado").length;
   const totalPendientes = totalEntregados - totalCompletados;
 
@@ -270,9 +280,10 @@ export function RecepcionAlumnos({
                     type="number"
                     min="1"
                     max="300"
+                    placeholder="Sin plazo"
                     value={minutosCierre}
                     onChange={(e) => cambiarMinutosCierre(e.target.value)}
-                    style={{ width: "60px", padding: "4px 6px", borderRadius: "4px", border: "1px solid #dadce0" }}
+                    style={{ width: "85px", padding: "4px 6px", borderRadius: "4px", border: "1px solid #dadce0" }}
                   />
                 </label>
               </div>
@@ -524,9 +535,12 @@ export function RecepcionAlumnos({
                       </td>
                       {vista !== "recepcion" && <><td>
                         {examen.estado_revision === "completado" ? (
-                          <strong style={{ color: Number(examen.nota_final) >= 10.5 ? "#137333" : "#d93025" }}>
-                            {Number(examen.nota_final).toFixed(2)}
-                          </strong>
+                          <span>
+                            <strong style={{ color: Number(examen.nota_final) >= minimoAprobatorio ? "#137333" : "#b3261e" }}>
+                              {Number(examen.nota_final).toFixed(2)}
+                            </strong>{" "}
+                            <span style={{ fontSize: "12px", color: "#5f6368" }}>{Number(examen.nota_final) >= minimoAprobatorio ? "Aprobado" : "Desaprobado"}</span>
+                          </span>
                         ) : examen.estado_revision === "procesando" ? (
                           <span style={{ color: "#1a73e8", fontSize: "0.82rem" }}>Calificando…</span>
                         ) : (
