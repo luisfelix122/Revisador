@@ -1,6 +1,7 @@
 export interface NodoAcademico {
   id: string;
   nombre: string;
+  tipo?: "anios_academicos" | "facultades" | "escuelas" | "promociones_ciclos" | "cursos";
   hijos?: NodoAcademico[];
 }
 export interface EvaluacionResumen {

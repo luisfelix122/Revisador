@@ -2,6 +2,8 @@ import {
   render as representar,
   screen as pantalla,
   fireEvent as disparar,
+  waitFor as esperarQue,
+  within as dentroDe,
 } from "@testing-library/react";
 import { test as prueba, expect as esperar, vi as simular } from "vitest";
 import type { SupabaseClient as ClienteSupabase } from "@supabase/supabase-js";
@@ -10,16 +12,61 @@ import { DetalleEvaluacion } from "../componentes/DetalleEvaluacion";
 import { guardarCredenciales } from "../servicios/credenciales";
 
 prueba("organiza la preparación en pasos y permite volver sin perder la rúbrica", async () => {
-  const servicio = {evaluacion:async()=>({id:'pc',titulo:'PC',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[],materiales_apoyo:[],examenes_estudiantes:[]})} as unknown as ServicioBiblioteca;
+  const servicio = {evaluacion:async()=>({id:'pc',titulo:'PC',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[{id:'solucion'}],materiales_apoyo:[],examenes_estudiantes:[]})} as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={false} alVolver={()=>{}} />);
   await pantalla.findByRole('heading',{name:'PC'});
-  esperar(pantalla.getByLabelText('Solución oficial')).toBeInTheDocument();
+  esperar(pantalla.getByText('Solución oficial guardada')).toBeInTheDocument();
   disparar.click(pantalla.getByRole('button',{name:/Paso 2.*Criterios/}));
   disparar.click(pantalla.getByRole('button',{name:'Añadir pregunta'}));
   esperar(pantalla.getByLabelText('Máximo P1')).toHaveValue(1);
   disparar.click(pantalla.getByRole('button',{name:/Paso 1.*Archivos/}));
   disparar.click(pantalla.getByRole('button',{name:/Paso 2.*Criterios/}));
   esperar(pantalla.getByLabelText('Máximo P1')).toHaveValue(1);
+});
+
+prueba("no permite avanzar sin solución", async () => {
+  const datos = {id:'pc',titulo:'PC',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[],materiales_apoyo:[],examenes_estudiantes:[],recepcion_abierta:true};
+  const servicio = {evaluacion:async()=>datos} as unknown as ServicioBiblioteca;
+  const vista = representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
+  await pantalla.findByRole('heading',{name:'PC'});
+  esperar(pantalla.getByRole('button',{name:/Paso 2.*Criterios/})).toBeDisabled();
+  esperar(pantalla.getByRole('button',{name:'Continuar a criterios'})).toBeDisabled();
+  vista.unmount();
+});
+
+prueba("habilita el análisis después de cerrar la recepción con exámenes recibidos", async () => {
+  const datos = {id:'pc',titulo:'PC',estado:'borrador',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[{id:'s'}],materiales_apoyo:[],examenes_estudiantes:[{id:'e',estado_revision:'pendiente',detalles_preguntas:[]}],recepcion_abierta:true};
+  const servicio = {evaluacion:async()=>({...datos}), configurarRecepcion:async()=>{datos.recepcion_abierta=false}} as unknown as ServicioBiblioteca;
+  representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
+  await pantalla.findByRole('heading',{name:'PC'});
+  esperar(pantalla.getByRole('button',{name:'Permitir reenvío'})).toBeInTheDocument();
+  esperar(pantalla.queryByText(/Calificados:/)).not.toBeInTheDocument();
+  disparar.click(pantalla.getByRole('checkbox',{name:/Autorizo una llamada de IA/}));
+  esperar(pantalla.getByRole('button',{name:'Analizar solución con IA'})).toBeDisabled();
+  disparar.click(pantalla.getByRole('button',{name:'Cerrar entregas ahora'}));
+  await esperarQue(() => esperar(pantalla.getByRole('button',{name:'Analizar solución con IA'})).toBeEnabled());
+});
+
+prueba("en carga manual el docente confirma que terminó antes de analizar", async () => {
+  const datos = {id:'pc',titulo:'PC',estado:'borrador',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[{id:'s'}],materiales_apoyo:[],examenes_estudiantes:[{id:'e',estado_revision:'pendiente',detalles_preguntas:[]}],recepcion_abierta:false};
+  const servicio = {evaluacion:async()=>datos} as unknown as ServicioBiblioteca;
+  representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
+  await pantalla.findByRole('heading',{name:'PC'});
+  disparar.click(pantalla.getByRole('button',{name:'Carga manual del docente'}));
+  disparar.click(pantalla.getByRole('checkbox',{name:/Autorizo una llamada de IA/}));
+  esperar(pantalla.getByRole('button',{name:'Analizar solución con IA'})).toBeDisabled();
+  disparar.click(pantalla.getByRole('checkbox',{name:/Terminé de cargar los exámenes/}));
+  esperar(pantalla.getByRole('button',{name:'Analizar solución con IA'})).toBeEnabled();
+  esperar(pantalla.queryByLabelText('Exámenes de estudiantes')).not.toBeInTheDocument();
+});
+
+prueba("permite analizar al vencer el plazo aunque no se hayan recibido exámenes", async () => {
+  const datos = {id:'pc',titulo:'PC',estado:'borrador',cursos:{nombre:'Curso'},puntaje_total_maximo:20,criterios_preguntas:[],soluciones_profesor:[{id:'s'}],materiales_apoyo:[],examenes_estudiantes:[],recepcion_abierta:true,fecha_cierre_programada:'2020-01-01T00:00:00Z'};
+  const servicio = {evaluacion:async()=>datos} as unknown as ServicioBiblioteca;
+  representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
+  await pantalla.findByRole('heading',{name:'PC'});
+  disparar.click(pantalla.getByRole('checkbox',{name:/Autorizo una llamada de IA/}));
+  esperar(pantalla.getByRole('button',{name:'Analizar solución con IA'})).toBeEnabled();
 });
 
 prueba(
@@ -61,9 +108,7 @@ prueba(
         await pantalla.findByRole("heading", { name: "Parcial de Álgebra" }),
       ).toBeInTheDocument();
       esperar(pantalla.getByLabelText("Solución oficial")).toBeInTheDocument();
-      esperar(
-        pantalla.getByLabelText("Exámenes de estudiantes"),
-      ).toBeInTheDocument();
+      esperar(pantalla.queryByLabelText("Exámenes de estudiantes")).not.toBeInTheDocument();
       esperar(peticion).toHaveBeenCalledTimes(1);
     } finally {
       peticion.mockRestore();
@@ -94,6 +139,7 @@ prueba("no envía exámenes si cambia la configuración después de preparar", a
     representar(<DetalleEvaluacion identificador="evaluacion" servicio={new ServicioBiblioteca(cliente)} apiVerificada={true} alVolver={()=>{}} />);
     await pantalla.findByRole("heading",{name:"Parcial"});
     esperar(pantalla.queryByText("Presupuesto y calificación del lote")).not.toBeInTheDocument();
+    disparar.click(pantalla.getByRole('button',{name:/Paso 3.*Revisión/}));
     disparar.click(pantalla.getByRole("button",{name:"Preparar calificación"}));
     disparar.click(await pantalla.findByRole("checkbox",{name:/Autorizo el envío/}));
     guardarCredenciales({proveedor:"gemini",clave:"clave-b",modelo:"modelo-b"}, false);
@@ -107,7 +153,7 @@ prueba("abre una evaluación recién creada aunque sus relaciones sean nulas", a
   const servicio = { evaluacion: async () => ({ id: "pc01", titulo: "PC01", cursos: { nombre: "Curso" }, puntaje_total_maximo: 20, criterios_preguntas: null, soluciones_profesor: null, materiales_apoyo: null, examenes_estudiantes: null }) } as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc01" servicio={servicio} apiVerificada={false} alVolver={() => {}} />);
   esperar(await pantalla.findByRole("heading", { name: "PC01" })).toBeInTheDocument();
-  esperar(pantalla.getByText("0/100 exámenes guardados")).toBeInTheDocument();
+  esperar(pantalla.getByLabelText("Solución oficial")).toBeInTheDocument();
 });
 
 prueba("considera aprobada la nota 10,5 y desaprobada la nota inferior", async () => {
@@ -116,12 +162,13 @@ prueba("considera aprobada la nota 10,5 y desaprobada la nota inferior", async (
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={false} alVolver={() => {}} />);
   await pantalla.findByRole("heading", { name: "PC" });
   disparar.change(pantalla.getByLabelText("Filtrar resultados"), { target: { value: "aprobados" } });
-  esperar(pantalla.getAllByText("Ana")).toHaveLength(2);
-  esperar(pantalla.queryByText("Luis")).not.toBeInTheDocument();
+  const resultados = pantalla.getByRole('heading',{name:'Resultados y revisión docente'}).closest('section')!;
+  esperar(dentroDe(resultados).getAllByText("Ana").length).toBeGreaterThan(0);
+  esperar(dentroDe(resultados).queryByText("Luis")).not.toBeInTheDocument();
 });
 
 prueba("añade una pregunta sin repetir números existentes en la rúbrica", async () => {
-  const servicio = { evaluacion: async () => ({ id: "pc", titulo: "PC", cursos: { nombre: "Curso" }, puntaje_total_maximo: 20, criterios_preguntas: [{numero_pregunta:1,puntaje_maximo:10,respuesta_esperada:"A"},{numero_pregunta:3,puntaje_maximo:10,respuesta_esperada:"B"}], soluciones_profesor: [], materiales_apoyo: [], examenes_estudiantes: [] }) } as unknown as ServicioBiblioteca;
+  const servicio = { evaluacion: async () => ({ id: "pc", titulo: "PC", cursos: { nombre: "Curso" }, puntaje_total_maximo: 20, criterios_preguntas: [{numero_pregunta:1,puntaje_maximo:10,respuesta_esperada:"A"},{numero_pregunta:3,puntaje_maximo:10,respuesta_esperada:"B"}], soluciones_profesor: [{id:'s'}], materiales_apoyo: [], examenes_estudiantes: [] }) } as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={false} alVolver={() => {}} />);
   await pantalla.findByRole("heading", {name:"PC"});
   disparar.click(pantalla.getByRole("button", {name:/Paso 2.*Criterios/}));
@@ -137,6 +184,7 @@ prueba("prepara y califica solo después de la autorización sin pedir tarifas",
   try {
     representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
     await pantalla.findByRole("heading",{name:"PC"});
+    disparar.click(pantalla.getByRole('button',{name:/Paso 3.*Revisión/}));
     esperar(pantalla.queryByLabelText(/Tarifa de entrada/)).not.toBeInTheDocument();
     disparar.click(pantalla.getByRole("button",{name:"Preparar calificación"}));
     const autorizar = await pantalla.findByRole("checkbox",{name:/Autorizo el envío/});

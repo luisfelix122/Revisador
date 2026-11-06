@@ -5,6 +5,35 @@ from presentacion.dependencias import obtener_proveedor
 import httpx
 
 
+def test_eliminar_nodo_solicita_borrado_seguro_del_elemento():
+    from uuid import uuid4
+    from unittest.mock import AsyncMock
+    from presentacion.seguridad import obtener_repositorio
+    identificador = str(uuid4())
+    repositorio = type('RepositorioPrueba', (), {'rpc': AsyncMock(return_value={'eliminado': True})})()
+    aplicacion.dependency_overrides[obtener_repositorio] = lambda: repositorio
+    try:
+        respuesta = TestClient(aplicacion).delete(f'/api/biblioteca/facultades/{identificador}')
+        assert respuesta.status_code == 200
+        repositorio.rpc.assert_awaited_once_with('eliminar_nodo_vacio', {'p_nivel':'facultades', 'p_id':identificador})
+    finally:
+        aplicacion.dependency_overrides.pop(obtener_repositorio, None)
+
+
+def test_eliminar_nodo_con_descendientes_muestra_motivo():
+    from uuid import uuid4
+    from unittest.mock import AsyncMock
+    from presentacion.seguridad import obtener_repositorio
+    repositorio = type('RepositorioPrueba', (), {'rpc': AsyncMock(return_value={'eliminado': False, 'detalle': 'Vacía este nivel primero.'})})()
+    aplicacion.dependency_overrides[obtener_repositorio] = lambda: repositorio
+    try:
+        respuesta = TestClient(aplicacion).delete(f'/api/biblioteca/cursos/{uuid4()}')
+        assert respuesta.status_code == 409
+        assert respuesta.json()['detail'] == 'Vacía este nivel primero.'
+    finally:
+        aplicacion.dependency_overrides.pop(obtener_repositorio, None)
+
+
 def test_preparacion_usa_tarifa_del_modelo_seleccionado(monkeypatch):
     from uuid import uuid4
     from unittest.mock import AsyncMock

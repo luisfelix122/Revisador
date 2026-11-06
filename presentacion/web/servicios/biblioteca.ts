@@ -40,6 +40,9 @@ export class ServicioBiblioteca {
       body: JSON.stringify({ nombre, padre_id }),
     });
   }
+  eliminarNodo(nivel: string, id: string) {
+    return this.datos(`/biblioteca/${nivel}/${id}`, { method: 'DELETE' });
+  }
   crearEvaluacion(datos: object) {
     return this.datos<{ id: string }>("/evaluaciones", {
       method: "POST",

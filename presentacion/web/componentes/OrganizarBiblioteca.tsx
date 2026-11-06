@@ -3,222 +3,94 @@ import { Ventana } from "./Ventana";
 import { ServicioBiblioteca, type Anio } from "../servicios/biblioteca";
 
 const niveles = [
-  ["anios_academicos", "Año académico"],
-  ["facultades", "Facultad"],
-  ["escuelas", "Escuela profesional"],
-  ["promociones_ciclos", "Promoción / ciclo"],
-  ["cursos", "Curso"],
-];
-export function OrganizarBiblioteca({
-  servicio,
-  anios,
-  cerrar,
-  alGuardar,
-}: {
-  servicio: ServicioBiblioteca;
-  anios: Anio[];
-  cerrar: () => void;
-  alGuardar: () => Promise<void>;
+  ["anios_academicos", "Año académico"], ["facultades", "Facultad"],
+  ["escuelas", "Escuela profesional"], ["promociones_ciclos", "Promoción / ciclo"], ["cursos", "Curso"],
+] as const;
+const NUEVO = "__nuevo__";
+const normalizar = (texto: string) => texto.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase("es");
+function parecido(primero: string, segundo: string) {
+  const a = normalizar(primero), b = normalizar(segundo);
+  if (Math.min(a.length, b.length) < 6 || Math.abs(a.length - b.length) > 1 || a === b) return false;
+  let i = 0, j = 0, diferencias = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++diferencias > 1) return false;
+    if (a.length >= b.length) i++;
+    if (b.length >= a.length) j++;
+  }
+  return diferencias + Number(i < a.length || j < b.length) <= 1;
+}
+
+export function OrganizarBiblioteca({ servicio, anios, cerrar, alGuardar }: {
+  servicio: ServicioBiblioteca; anios: Anio[]; cerrar: () => void; alGuardar: () => Promise<void>;
 }) {
-  const [nivel, cambiarNivel] = usarEstado(0),
-    [nombre, cambiarNombre] = usarEstado(""),
-    [padre, cambiarPadre] = usarEstado(""),
-    [ocupado, ocupar] = usarEstado(false),
-    [error, mostrarError] = usarEstado(""),
-    [exito, mostrarExito] = usarEstado("");
-  const padres =
-    nivel === 1
-      ? (anios || []).map((a) => ({ id: a.id, nombre: String(a.anio) }))
-      : nivel === 2
-        ? (anios || []).flatMap((a) => a.facultades || [])
-        : nivel === 3
-          ? (anios || []).flatMap((a) =>
-              (a.facultades || []).flatMap((f) => f.escuelas || []),
-            )
-          : (anios || []).flatMap((a) =>
-              (a.facultades || []).flatMap((f) =>
-                (f.escuelas || []).flatMap((e) =>
-                  (e.promociones_ciclos || []).map((c) => ({
-                    id: c.id,
-                    nombre: `${c.denominacion || "Ciclo"} (${f.nombre || "Facultad"})`,
-                  })),
-                ),
-              ),
-            );
-  const guardar = async (evento: React.FormEvent) => {
+  const [selecciones, cambiarSelecciones] = usarEstado<string[]>([]);
+  const [nombre, cambiarNombre] = usarEstado("");
+  const [ocupado, ocupar] = usarEstado(false);
+  const [error, mostrarError] = usarEstado("");
+  const [exito, mostrarExito] = usarEstado("");
+  const [confirmarParecido, cambiarConfirmarParecido] = usarEstado(false);
+  const anio = anios.find((item) => item.id === selecciones[0]);
+  const facultad = anio?.facultades?.find((item) => item.id === selecciones[1]);
+  const escuela = facultad?.escuelas?.find((item) => item.id === selecciones[2]);
+  const ciclo = escuela?.promociones_ciclos?.find((item) => item.id === selecciones[3]);
+  const opciones = [
+    anios.map((item) => ({id:item.id,nombre:String(item.anio)})),
+    (anio?.facultades || []).map((item) => ({id:item.id,nombre:item.nombre})),
+    (facultad?.escuelas || []).map((item) => ({id:item.id,nombre:item.nombre})),
+    (escuela?.promociones_ciclos || []).map((item) => ({id:item.id,nombre:item.denominacion})),
+    (ciclo?.cursos || []).map((item) => ({id:item.id,nombre:item.nombre})),
+  ];
+  const cambiarSeleccion = (indice: number, valor: string) => {
+    cambiarSelecciones((previas) => [...previas.slice(0, indice), valor]);
+    cambiarNombre(""); cambiarConfirmarParecido(false); mostrarError(""); mostrarExito("");
+  };
+  const guardar = async (indice: number, evento: React.FormEvent) => {
     evento.preventDefault();
-    ocupar(true);
-    mostrarError("");
-    mostrarExito("");
-    try {
-      await servicio.crearNodo(
-        niveles[nivel][0],
-        nombre.trim(),
-        nivel ? padre : undefined,
-      );
-      await alGuardar();
-      const nombreCreado = nombre.trim();
-      cambiarNombre("");
-      mostrarExito(`¡${niveles[nivel][1]} "${nombreCreado}" guardado con éxito!`);
-      if (nivel === 4) {
-        window.setTimeout(() => cerrar(), 700);
-      }
-    } catch (problema) {
-      mostrarError(
-        problema instanceof Error ? problema.message : "No se pudo guardar",
-      );
-    } finally {
-      ocupar(false);
+    const limpio = nombre.trim().replace(/\s+/g, " ");
+    if (opciones[indice].some((item) => normalizar(item.nombre) === normalizar(limpio))) {
+      mostrarError("Ya existe un elemento con ese nombre en esta ubicación."); return;
     }
-  };
-
-  const cargarEjemplo = async () => {
-    ocupar(true);
-    mostrarError("");
-    try {
-      const anio = (await servicio.crearNodo(
-        "anios_academicos",
-        "2026",
-      )) as { id: string };
-      const facultad = (await servicio.crearNodo(
-        "facultades",
-        "Facultad de Ingeniería",
-        anio.id,
-      )) as { id: string };
-      const escuela = (await servicio.crearNodo(
-        "escuelas",
-        "Ingeniería de Sistemas",
-        facultad.id,
-      )) as { id: string };
-      const ciclo = (await servicio.crearNodo(
-        "promociones_ciclos",
-        "Ciclo 2026-I",
-        escuela.id,
-      )) as { id: string };
-      await servicio.crearNodo(
-        "cursos",
-        "Algoritmos y Estructuras de Datos",
-        ciclo.id,
-      );
-      await servicio.crearNodo("cursos", "Base de Datos", ciclo.id);
-      await alGuardar();
-      cerrar();
-    } catch (problema) {
-      mostrarError(
-        problema instanceof Error
-          ? problema.message
-          : "No se pudo cargar la estructura de ejemplo",
-      );
-    } finally {
-      ocupar(false);
+    const similar = indice !== 3 && opciones[indice].find((item) => parecido(item.nombre, limpio));
+    if (similar && !confirmarParecido) {
+      mostrarError(`Ya existe un nombre parecido: «${similar.nombre}». Confirma si se trata de otro elemento.`); return;
     }
+    if (indice === 3 && (/[,;\n]/.test(limpio) || /\s(y|e)\s/i.test(limpio))) {
+      mostrarError("Ingresa un solo ciclo a la vez."); return;
+    }
+    ocupar(true); mostrarError(""); mostrarExito("");
+    try {
+      const creado = await servicio.crearNodo(niveles[indice][0], limpio, indice ? selecciones[indice - 1] : undefined) as {id:string};
+      await alGuardar();
+      cambiarSelecciones((previas) => [...previas.slice(0, indice), creado.id]);
+      cambiarNombre(""); cambiarConfirmarParecido(false); mostrarExito(`${niveles[indice][1]} guardado.`);
+    } catch (problema) {
+      mostrarError(problema instanceof Error ? problema.message : "No se pudo guardar.");
+    } finally { ocupar(false); }
   };
-
   return (
-    <Ventana titulo="Organizar biblioteca" cerrar={cerrar}>
+    <Ventana titulo="Organizar cursos" cerrar={cerrar}>
       <div className="contenido-ventana">
-        <p className="descripcion">
-          Crea la estructura de tus cursos, desde el año hasta la asignatura.
-        </p>
-
-        {!anios.length && (
-          <div
-            style={{
-              padding: "14px",
-              background: "#e8f0fe",
-              borderRadius: "8px",
-              marginBottom: "16px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-            }}
-          >
-            <strong style={{ color: "#1a73e8" }}>
-              ¿Empezando desde cero?
-            </strong>
-            <p style={{ margin: 0, fontSize: "14px", color: "#202124" }}>
-              Crea automáticamente una estructura inicial completa (Año 2026,
-              Facultad de Ingeniería, Sistemas, Ciclo 2026-I y cursos de
-              ejemplo):
-            </p>
-            <button
-              type="button"
-              className="boton-primario"
-              disabled={ocupado}
-              onClick={() => void cargarEjemplo()}
-            >
-              {ocupado
-                ? "Generando estructura…"
-                : "✨ Cargar estructura inicial recomendada"}
-            </button>
-          </div>
-        )}
-
-        <form onSubmit={guardar}>
-        <label>
-          Nivel
-          <select
-            value={nivel}
-            onChange={(evento) => {
-              cambiarNivel(Number(evento.target.value));
-              cambiarPadre("");
-            }}
-          >
-            {niveles.map(([, nombre], indice) => (
-              <option key={indice} value={indice}>
-                {nombre}
-              </option>
-            ))}
-          </select>
-        </label>
-        {nivel > 0 && (
-          <label>
-            Nivel superior
-            <select
-              required
-              value={padre}
-              onChange={(evento) => cambiarPadre(evento.target.value)}
-            >
-              <option value="">Selecciona una ubicación</option>
-              {padres.map((padre) => (
-                <option key={padre.id} value={padre.id}>
-                  {padre.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <label>
-          {niveles[nivel][1]}
-          <input
-            required
-            maxLength={100}
-            value={nombre}
-            placeholder={nivel === 0 ? "2026" : "Escribe un nombre"}
-            onChange={(evento) => cambiarNombre(evento.target.value)}
-          />
-        </label>
-        {exito && (
-          <p role="status" className="exito" style={{ margin: "12px 0" }}>
-            {exito}
-          </p>
-        )}
-        {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
-        )}
-        <button className="boton-primario" disabled={ocupado}>
-          {ocupado
-            ? "Guardando…"
-            : "Crear " + niveles[nivel][1].toLocaleLowerCase("es")}
-        </button>
-        <p className="ayuda-campo">
-          Los cambios se guardan en tu biblioteca privada. Puedes crear otro
-          nivel sin cerrar esta ventana.
-        </p>
-      </form>
-    </div>
+        <p className="descripcion">Elige o crea cada nivel para continuar. Solo verás las opciones de la ubicación seleccionada.</p>
+        {niveles.map(([clave, titulo], indice) => {
+          if (indice > 0 && (!selecciones[indice - 1] || selecciones[indice - 1] === NUEVO)) return null;
+          const valor = selecciones[indice] || "";
+          return <div key={clave} className="organizar-nivel">
+            <label>{titulo}<select value={valor} disabled={ocupado} onChange={(evento) => cambiarSeleccion(indice, evento.target.value)}>
+              <option value="">Selecciona {titulo.toLocaleLowerCase("es")}</option>
+              {opciones[indice].map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}
+              <option value={NUEVO}>+ Crear {titulo.toLocaleLowerCase("es")}</option>
+            </select></label>
+            {valor === NUEVO && <form onSubmit={(evento) => void guardar(indice, evento)}>
+              <label>Nombre de {titulo.toLocaleLowerCase("es")}<input required maxLength={100} inputMode={indice === 0 ? "numeric" : "text"} value={nombre} onChange={(evento) => { cambiarNombre(evento.target.value); cambiarConfirmarParecido(false); mostrarError(""); }} placeholder={indice === 0 ? "Ej. 2026" : "Escribe un nombre"} /></label>
+              {error.includes('nombre parecido') && <label className="casilla"><input type="checkbox" checked={confirmarParecido} onChange={(evento) => cambiarConfirmarParecido(evento.target.checked)} />Es un elemento diferente</label>}
+              <button className="boton-primario" disabled={ocupado || !nombre.trim()}>{ocupado ? "Guardando…" : `Crear ${titulo.toLocaleLowerCase("es")}`}</button>
+            </form>}
+          </div>;
+        })}
+        {exito && <p role="status" className="exito">{exito}</p>}
+        {error && <p role="alert" className="error">{error}</p>}
+      </div>
     </Ventana>
   );
 }

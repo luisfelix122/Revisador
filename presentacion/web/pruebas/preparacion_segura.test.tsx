@@ -11,6 +11,7 @@ prueba("descarta autorización anterior si falla una nueva preparación", async 
   const servicio={evaluacion:async()=>evaluacion,datos} as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
   await pantalla.findByRole("heading",{name:"PC"});
+  disparar.click(pantalla.getByRole('button',{name:/Paso 3.*Revisión/}));
   disparar.click(pantalla.getByRole("button",{name:"Preparar calificación"}));
   disparar.click(await pantalla.findByRole("checkbox",{name:/Autorizo el envío/}));
   disparar.click(pantalla.getByRole("button",{name:"Preparar calificación"}));
@@ -25,7 +26,7 @@ prueba("la revisión desde recepción requiere autorización antes de enviar ex�
   const servicio={evaluacion:async()=>evaluacion,datos} as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
   await pantalla.findByRole("heading",{name:"PC"});
-  disparar.click(pantalla.getByRole('button',{name:/Recepción de alumnos/}));
+  disparar.click(pantalla.getByRole('button',{name:/Paso 3.*Revisión/}));
   disparar.click(pantalla.getByRole('button',{name:/Revisar solo pendientes/}));
   await pantalla.findByRole('checkbox',{name:/Autorizo el envío/});
   esperar(datos.mock.calls.some(([ruta])=>String(ruta).includes('/calificar/'))).toBe(false);
@@ -43,7 +44,7 @@ prueba("si falla reiniciar un examen, no se envía a calificar", async () => {
   const servicio={evaluacion:async()=>evaluacion,datos,reiniciarExamen:simular.fn().mockRejectedValue(new Error('No se pudo reiniciar'))} as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
   await pantalla.findByRole('heading',{name:'PC'});
-  disparar.click(pantalla.getByRole('button',{name:/Recepción de alumnos/}));
+  disparar.click(pantalla.getByRole('button',{name:/Paso 3.*Revisión/}));
   disparar.click(pantalla.getByRole('button',{name:/Revisar a todos/}));
   disparar.click(await pantalla.findByRole('checkbox',{name:/Autorizo el envío/}));
   disparar.click(pantalla.getByRole('button',{name:'Confirmar y calificar lote'}));
@@ -59,7 +60,7 @@ prueba("el resumen muestra el costo estimado de los exámenes elegidos", async (
   const servicio={evaluacion:async()=>evaluacion,datos} as unknown as ServicioBiblioteca;
   representar(<DetalleEvaluacion identificador="pc" servicio={servicio} apiVerificada={true} alVolver={()=>{}} />);
   await pantalla.findByRole('heading',{name:'PC'});
-  disparar.click(pantalla.getByRole('button',{name:/Recepción de alumnos/}));
+  disparar.click(pantalla.getByRole('button',{name:/Paso 3.*Revisión/}));
   disparar.click(pantalla.getByRole('button',{name:/Revisar a todos/}));
   esperar(await pantalla.findByText(/Costo estimado: ~\$0.0420 USD/)).toBeInTheDocument();
   const opciones = datos.mock.calls[0][1] as RequestInit;

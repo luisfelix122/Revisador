@@ -30,9 +30,19 @@ import { Ventana } from "./componentes/Ventana";
 import type { NodoAcademico, EvaluacionResumen } from "./tipos";
 import { usarPanelMovil } from "./servicios/usarPanelMovil";
 
+function rutaDeNodo(nodos: NodoAcademico[], id?: string): string[] {
+  for (const nodo of nodos) {
+    if (nodo.id === id) return [nodo.nombre];
+    const ruta = rutaDeNodo(nodo.hijos || [], id);
+    if (ruta.length) return [nodo.nombre, ...ruta];
+  }
+  return [];
+}
+
 interface Propiedades {
   contenido?: Contenido;
   alOrganizar?: () => void;
+  alEliminarNodo?: (tipo: NonNullable<NodoAcademico['tipo']>, id: string, nombre: string) => void;
   alCerrarSesion?: () => void;
   alVerificarIA?: (verificada: boolean) => void;
   alVolverBiblioteca?: () => void;
@@ -48,6 +58,7 @@ interface Propiedades {
 export function Aplicacion({
   contenido,
   alOrganizar,
+  alEliminarNodo,
   alCerrarSesion,
   alVerificarIA,
   alVolverBiblioteca,
@@ -73,6 +84,7 @@ export function Aplicacion({
   const [tipo, cambiarTipo] = usarEstado("todas");
   const [movil, cambiarMovil] = usarEstado(() => window.innerWidth <= 760);
   const [busquedaAbierta, abrirBusqueda] = usarEstado(false);
+  const rutaActiva = rutaDeNodo(nodos, activo);
   const campoBusqueda = usarReferencia<HTMLInputElement>(null);
   const cerrarPanel = usarCallback(() => abrirLateral(false), []);
   const panel = usarPanelMovil(movil && lateralAbierto, cerrarPanel);
@@ -245,9 +257,10 @@ export function Aplicacion({
             <Explorador
               nodos={nodos}
               activo={activo}
-              alSeleccionar={alSeleccionar}
+              alSeleccionar={(id) => { cambiarSeccion('biblioteca'); buscar(''); cambiarTipo('todas'); alSeleccionar?.(id); if (movil) abrirLateral(false); }}
               alRegresar={alRegresar}
               alOrganizar={alOrganizar}
+              alEliminar={alEliminarNodo}
             />
             <div className="pie-lateral">
               <button
@@ -281,12 +294,13 @@ export function Aplicacion({
               <span>
                 {seccion === "biblioteca" ? "Biblioteca" : "Recientes"}
               </span>
+              {seccion === 'biblioteca' && rutaActiva.map((nombre, indice) => <span key={indice}> › {nombre}</span>)}
             </div>
             <div className="cabecera-contenido">
               <div>
                 <h1>
                   {seccion === "biblioteca"
-                    ? "Biblioteca académica"
+                    ? rutaActiva.at(-1) || "Biblioteca académica"
                     : "Evaluaciones recientes"}
                 </h1>
                 <p>Un lugar para tus cursos, evaluaciones y resultados.</p>
@@ -298,11 +312,6 @@ export function Aplicacion({
                 <Agregar size={18} />{" "}
                 {alCrearEvaluacion ? "Nueva evaluación" : "Preparar evaluación"}
               </button>
-              {alOrganizar && (
-                <button className="boton-contorno" onClick={alOrganizar}>
-                  Organizar biblioteca
-                </button>
-              )}
             </div>
             <div className="barra-archivos">
               <div className="filtro-archivos">
@@ -399,19 +408,6 @@ export function Aplicacion({
                     ? "Prueba con otra búsqueda o cambia el filtro."
                     : "Todavía no hay archivos. Todo está vacío y sin tareas pendientes."}
                 </p>
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
-                  <button className="boton-texto" onClick={nueva}>
-                    <Agregar size={17} />{" "}
-                    {alCrearEvaluacion
-                      ? "Crear mi primera evaluación"
-                      : "Ver cómo preparar una evaluación"}
-                  </button>
-                  {alOrganizar && (
-                    <button className="boton-texto" onClick={alOrganizar}>
-                      <Carpeta size={17} /> Organizar cursos y facultades
-                    </button>
-                  )}
-                </div>
                 {!alCrearEvaluacion && (
                   <p className="alcance-creacion">
                     Creación de evaluaciones: próximamente.

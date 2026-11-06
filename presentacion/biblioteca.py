@@ -42,6 +42,14 @@ async def crear_nodo(nivel: Nivel, peticion: NuevoNodo, repositorio: Repositorio
     return filas[0]
 
 
+@enrutador.delete('/biblioteca/{nivel}/{identificador}')
+async def eliminar_nodo(nivel: Nivel, identificador: UUID, repositorio: Repositorio):
+    resultado = await repositorio.rpc('eliminar_nodo_vacio', {'p_nivel': nivel, 'p_id': str(identificador)})
+    if not resultado.get('eliminado'):
+        raise HTTPException(409, resultado.get('detalle', 'No se pudo eliminar el elemento.'))
+    return resultado
+
+
 class NuevaEvaluacion(BaseModel):
     curso_id: UUID
     titulo: str = Field(min_length=1, max_length=255)

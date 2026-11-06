@@ -5,6 +5,7 @@ import {
   BookOpen as Libro,
   ArrowLeft as Regresar,
   Plus as Agregar,
+  Trash2 as Eliminar,
 } from "lucide-react";
 import type { NodoAcademico } from "../tipos";
 
@@ -14,16 +15,19 @@ interface Propiedades {
   alSeleccionar?: (id: string) => void;
   alRegresar?: () => void;
   alOrganizar?: () => void;
+  alEliminar?: (tipo: NonNullable<NodoAcademico['tipo']>, id: string, nombre: string) => void;
 }
 
 function Rama({
   nodo,
   activo,
   alSeleccionar,
+  alEliminar,
 }: {
   nodo: NodoAcademico;
   activo?: string;
   alSeleccionar?: (id: string) => void;
+  alEliminar?: Propiedades['alEliminar'];
 }) {
   const [abierto, abrir] = usarEstado(false);
   return (
@@ -48,6 +52,7 @@ function Rama({
           {nodo.hijos ? <Carpeta size={17} /> : <Libro size={17} />}
           <span>{nodo.nombre}</span>
         </button>
+        {nodo.tipo && alEliminar && <button type="button" className="boton-icono pequeno" aria-label={`Eliminar ${nodo.nombre}`} title="Eliminar si está vacío" onClick={() => alEliminar(nodo.tipo!, nodo.id, nodo.nombre)}><Eliminar size={15} /></button>}
       </div>
       {abierto && nodo.hijos && (
         <ul className="ramas-hijas">
@@ -57,6 +62,7 @@ function Rama({
               nodo={hijo}
               activo={activo}
               alSeleccionar={alSeleccionar}
+              alEliminar={alEliminar}
             />
           ))}
         </ul>
@@ -71,13 +77,14 @@ export function Explorador({
   alSeleccionar,
   alRegresar,
   alOrganizar,
+  alEliminar,
 }: Propiedades) {
   return (
     <section className="explorador" aria-label="Explorador académico">
       <div className="titulo-explorador">
         <h2>Biblioteca académica</h2>
         <div style={{ display: "flex", gap: "4px" }}>
-          {alOrganizar && (
+          {alOrganizar && nodos.length > 0 && (
             <button
               className="boton-icono pequeno"
               onClick={alOrganizar}
@@ -106,6 +113,7 @@ export function Explorador({
               nodo={nodo}
               activo={activo}
               alSeleccionar={alSeleccionar}
+              alEliminar={alEliminar}
             />
           ))}
         </ul>

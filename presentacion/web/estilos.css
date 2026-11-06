@@ -337,6 +337,13 @@ p {
 .rama.seleccionada {
   background: #dce8fa;
 }
+.rama > .boton-icono { flex: 0 0 30px; color: #5f6368; }
+.rama > .boton-icono:hover { color: #b3261e; }
+.organizar-nivel { padding: 14px 0; border-bottom: 1px solid #e8eaed; }
+.organizar-nivel form { margin-top: 12px; padding: 14px; background: #f8f9fa; border-radius: 8px; }
+.organizar-nivel form .boton-primario { margin-top: 10px; }
+.modalidades-entrega { margin: 22px 0 28px; }
+.modalidades-entrega > p { margin-top: 6px; color: #5f6368; font-size: 13px; }
 .desplegar {
   display: grid;
   place-items: center;

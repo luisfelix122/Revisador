@@ -9,7 +9,6 @@ import {
   Upload as Subir,
   Download as Descargar,
   Check as Check,
-  Share2 as CompartirIcon,
   RotateCw as GirarIcon,
   ZoomIn as AcercarIcon,
   ZoomOut as AlejarIcon,
@@ -69,7 +68,8 @@ export function DetalleEvaluacion({
     [busqueda, buscar] = usarEstado(""),
     [filtro, filtrar] = usarEstado("todos"),
     [paso, cambiarPaso] = usarEstado<1 | 2 | 3>(1),
-    [pestanaActiva, cambiarPestanaActiva] = usarEstado<"recepcion" | "docente">("docente"),
+    [modoEntrega, cambiarModoEntrega] = usarEstado<"alumnos" | "manual">("alumnos"),
+    [manualFinalizada, marcarManualFinalizada] = usarEstado(false),
     [revisando, revisar] = usarEstado<Examen | null>(null);
   const detener = usarReferencia(false);
   const pasoInicializado = usarReferencia(false);
@@ -79,7 +79,8 @@ export function DetalleEvaluacion({
     const datos = await servicio.evaluacion(identificador);
     if (!pasoInicializado.current) {
       pasoInicializado.current = true;
-      if ((datos.examenes_estudiantes || []).some((examen) => examen.estado_revision === "completado") || ((datos.soluciones_profesor || []).length && (datos.criterios_preguntas || []).length && (datos.examenes_estudiantes || []).length)) cambiarPaso(3);
+      if ((datos.examenes_estudiantes || []).some((examen) => examen.estado_revision === "completado")) cambiarPaso(3);
+      else if ((datos.soluciones_profesor || []).length) cambiarPaso(2);
     }
     cambiarEvaluacion({
       ...datos,
@@ -106,6 +107,23 @@ export function DetalleEvaluacion({
       detener.current = true;
     };
   }, [cargar]);
+  const actualizarRecepcion = usarCallback(async () => {
+    const datos = await servicio.evaluacion(identificador);
+    cambiarEvaluacion((actual) => actual ? {
+      ...actual,
+      recepcion_abierta: datos.recepcion_abierta,
+      fecha_cierre_programada: datos.fecha_cierre_programada,
+      tiempo_limite_minutos: datos.tiempo_limite_minutos,
+      cantidad_estudiantes_esperados: datos.cantidad_estudiantes_esperados,
+      permitir_reenvios_global: datos.permitir_reenvios_global,
+      examenes_estudiantes: (datos.examenes_estudiantes || []).map((examen) => ({...examen, detalles_preguntas: examen.detalles_preguntas || []})),
+    } : actual);
+  }, [identificador, servicio]);
+  usarEfecto(() => {
+    if (paso !== 2 || modoEntrega !== 'alumnos' || !evaluacion?.recepcion_abierta) return;
+    const intervalo = window.setInterval(() => void actualizarRecepcion().catch(() => {}), 10000);
+    return () => window.clearInterval(intervalo);
+  }, [paso, modoEntrega, evaluacion?.recepcion_abierta, actualizarRecepcion]);
   const hayExamenEnProceso = evaluacion?.examenes_estudiantes.some(
     (examen) => examen.estado_revision === "procesando",
   ) ?? false;
@@ -317,7 +335,6 @@ export function DetalleEvaluacion({
       return;
     }
 
-    cambiarPestanaActiva("docente");
     cambiarPaso(3);
     await preparar(examenesAProcesar);
   };
@@ -393,6 +410,13 @@ export function DetalleEvaluacion({
     cicloObj?.denominacion,
     cursoObj?.nombre,
   ].filter(Boolean);
+  const puedePrepararCriterios = evaluacion.soluciones_profesor.length > 0 || completados.length > 0;
+  const cupoCompleto = Boolean(evaluacion.cantidad_estudiantes_esperados && evaluacion.examenes_estudiantes.length >= evaluacion.cantidad_estudiantes_esperados);
+  const plazoVencido = Boolean(evaluacion.fecha_cierre_programada && Date.parse(evaluacion.fecha_cierre_programada) <= Date.now());
+  const recepcionTerminada = modoEntrega === 'manual'
+    ? evaluacion.examenes_estudiantes.length > 0 && manualFinalizada
+    : plazoVencido || cupoCompleto || (!evaluacion.recepcion_abierta && evaluacion.examenes_estudiantes.length > 0);
+  const puedeRevisar = completados.length > 0 || (guardada && recepcionTerminada && evaluacion.examenes_estudiantes.length > 0);
 
   return (
     <section className="detalle">
@@ -417,27 +441,6 @@ export function DetalleEvaluacion({
           {evaluacion.estado === "borrador" ? "En preparación" : "Calificada"}
         </span>
       </div>
-      <div className="pestanas-modalidad">
-        <button
-          type="button"
-          className={`pestana-boton ${pestanaActiva === "recepcion" ? "activa" : ""}`}
-          onClick={() => cambiarPestanaActiva("recepcion")}
-        >
-          <CompartirIcon size={16} />
-          Recepción de alumnos
-          <span className="badge-contador">
-            {evaluacion.examenes_estudiantes.length}
-          </span>
-        </button>
-        <button
-          type="button"
-          className={`pestana-boton ${pestanaActiva === "docente" ? "activa" : ""}`}
-          onClick={() => cambiarPestanaActiva("docente")}
-        >
-          <Subir size={16} />
-          Carga docente (manual)
-        </button>
-      </div>
       {error && (
         <p className="error" role="alert">
           {error}
@@ -448,42 +451,28 @@ export function DetalleEvaluacion({
           {aviso}
         </p>
       )}
-      {pestanaActiva === "recepcion" ? (
-        <RecepcionAlumnos
-          evaluacion={evaluacion}
-          servicio={servicio}
-          apiVerificada={apiVerificada}
-          alActualizar={cargar}
-          alRevisarExamen={(examen) => revisar(examen)}
-          alCalificarLote={alCalificarLote}
-          ocupado={ocupado}
-          corriendo={corriendo}
-        />
-      ) : (
-        <>
           <nav className="pasos-evaluacion" aria-label="Pasos para revisar la evaluación">
             {([
               {numero: 1, titulo: 'Archivos', detalle: 'Prepara el material'},
               {numero: 2, titulo: 'Criterios', detalle: 'Define la rúbrica'},
               {numero: 3, titulo: 'Revisión', detalle: 'Confirma y califica'},
             ] as const).map((item) => (
-              <button key={item.numero} type="button" className={`paso-evaluacion ${paso === item.numero ? 'activo' : ''}`} aria-current={paso === item.numero ? 'step' : undefined} onClick={() => cambiarPaso(item.numero)}>
+              <button key={item.numero} type="button" className={`paso-evaluacion ${paso === item.numero ? 'activo' : ''}`} aria-current={paso === item.numero ? 'step' : undefined} disabled={(item.numero === 2 && !puedePrepararCriterios) || (item.numero === 3 && !puedeRevisar)} onClick={() => cambiarPaso(item.numero)}>
                 <span className="paso-numero">{item.numero}</span>
                 <span><strong>Paso {item.numero} · {item.titulo}</strong><small>{item.detalle}</small></span>
               </button>
             ))}
           </nav>
           <section className="seccion-evaluacion" aria-labelledby="titulo-archivos" hidden={paso !== 1}>
-        <h2 id="titulo-archivos">Solución, materiales y exámenes</h2>
+        <h2 id="titulo-archivos">Solución y materiales de apoyo</h2>
         <p className="descripcion">
-          Hasta 3 MB por archivo y 20 páginas por documento. Cada imagen de
-          estudiante corresponde a un examen. La subida no inicia la
-          calificación.
+          Hasta 3 MB por archivo y 20 páginas por documento. El
+          material de apoyo es opcional. La subida no inicia la calificación.
         </p>
         <div className="cargas-archivos">
           <label>
             Solución oficial
-            <input
+            {!evaluacion.soluciones_profesor.length && <input
               aria-label="Solución oficial"
               type="file"
               accept=".jpg,.jpeg,.png,.webp,.pdf,.docx"
@@ -497,7 +486,7 @@ export function DetalleEvaluacion({
                 void subir("solucion", evento.target.files);
                 evento.target.value = "";
               }}
-            />
+            />}
             <span>
               {evaluacion.soluciones_profesor.length
                 ? "Solución oficial guardada"
@@ -521,23 +510,6 @@ export function DetalleEvaluacion({
               {evaluacion.materiales_apoyo.length}/5 materiales guardados
             </span>
           </label>
-          <label>
-            Exámenes de estudiantes
-            <input
-              aria-label="Exámenes de estudiantes"
-              type="file"
-              multiple
-              accept=".jpg,.jpeg,.png,.webp"
-              disabled={ocupado || corriendo || bloqueada}
-              onChange={(evento) => {
-                void subir("examen", evento.target.files);
-                evento.target.value = "";
-              }}
-            />
-            <span>
-              {evaluacion.examenes_estudiantes.length}/100 exámenes guardados
-            </span>
-          </label>
         </div>
         {(evaluacion.materiales_apoyo || []).length > 0 && (
           <ul className="materiales">
@@ -554,7 +526,7 @@ export function DetalleEvaluacion({
             <p className="indicaciones">{evaluacion.indicaciones_profesor}</p>
           </details>
         )}
-        <div className="navegacion-pasos"><span>Puedes volver a este paso en cualquier momento.</span><button type="button" className="boton-primario" onClick={() => cambiarPaso(2)}>Continuar a criterios</button></div>
+        <div className="navegacion-pasos"><span>{puedePrepararCriterios ? 'Puedes volver a este paso en cualquier momento.' : 'Adjunta la solución oficial para continuar.'}</span><button type="button" className="boton-primario" disabled={!puedePrepararCriterios} onClick={() => cambiarPaso(2)}>Continuar a criterios</button></div>
       </section>
       <section className="seccion-evaluacion" hidden={paso !== 2}>
         <h2>Criterios de corrección</h2>
@@ -563,6 +535,39 @@ export function DetalleEvaluacion({
           las respuestas esperadas y asegúrate de que sumen{" "}
           {evaluacion.puntaje_total_maximo} puntos.
         </p>
+        <div className="modalidades-entrega" aria-label="Forma de recepción">
+          <h3>Recepción de exámenes</h3>
+          <p>Elige cómo recibirá el docente los exámenes de esta evaluación.</p>
+          <div className="pestanas-modalidad">
+            <button type="button" className={`pestana-boton ${modoEntrega === "alumnos" ? "activa" : ""}`} onClick={() => cambiarModoEntrega("alumnos")}>Enlace para alumnos</button>
+            <button type="button" className={`pestana-boton ${modoEntrega === "manual" ? "activa" : ""}`} onClick={() => cambiarModoEntrega("manual")}>Carga manual del docente</button>
+          </div>
+          {modoEntrega === "alumnos" ? (
+            <RecepcionAlumnos vista="recepcion" evaluacion={evaluacion} servicio={servicio} apiVerificada={apiVerificada} alActualizar={actualizarRecepcion} alRevisarExamen={(examen) => revisar(examen)} alCalificarLote={alCalificarLote} ocupado={ocupado} corriendo={corriendo} />
+          ) : (
+            <div className="cargas-archivos">
+          <label>
+            Exámenes de estudiantes
+            {!manualFinalizada && (            <input
+              aria-label="Exámenes de estudiantes"
+              type="file"
+              multiple
+              accept=".jpg,.jpeg,.png,.webp"
+              disabled={ocupado || corriendo || bloqueada}
+              onChange={(evento) => {
+                void subir("examen", evento.target.files);
+                evento.target.value = "";
+              }}
+            />)}
+            <span>
+              {evaluacion.examenes_estudiantes.length}/100 exámenes guardados
+            </span>
+          </label>
+              <label className="casilla"><input type="checkbox" checked={manualFinalizada} disabled={!evaluacion.examenes_estudiantes.length || ocupado} onChange={(evento) => marcarManualFinalizada(evento.target.checked)} />Terminé de cargar los exámenes</label>
+            </div>
+          )}
+          {!recepcionTerminada && <p className="ayuda-campo">Para analizar la solución, termina la carga manual o espera a que se complete el aforo o se cierre la recepción.</p>}
+        </div>
         {!bloqueada && (
           <>
             <label className="casilla">
@@ -581,6 +586,7 @@ export function DetalleEvaluacion({
                 corriendo ||
                 !apiVerificada ||
                 !consentimientoAnalisis ||
+                !recepcionTerminada ||
                 !evaluacion.soluciones_profesor.length
               }
               onClick={() => void analizar()}
@@ -724,8 +730,9 @@ export function DetalleEvaluacion({
             </span>
           )}
         </div>
-        <div className="navegacion-pasos"><button type="button" className="boton-texto" onClick={() => cambiarPaso(1)}>Volver a archivos</button><button type="button" className="boton-primario" onClick={() => cambiarPaso(3)}>Continuar al resumen</button></div>
+        <div className="navegacion-pasos"><button type="button" className="boton-texto" onClick={() => cambiarPaso(1)}>Volver a archivos</button><button type="button" className="boton-primario" disabled={!puedeRevisar} onClick={() => cambiarPaso(3)}>Continuar al resumen</button></div>
       </section>
+      {paso === 3 && <RecepcionAlumnos vista="revision" evaluacion={evaluacion} servicio={servicio} apiVerificada={apiVerificada} alActualizar={cargar} alRevisarExamen={(examen) => revisar(examen)} alCalificarLote={alCalificarLote} ocupado={ocupado} corriendo={corriendo} />}
       <section className="seccion-evaluacion" hidden={paso !== 3}>
         <h2>Resumen de revisión</h2>
         <p className="descripcion">
@@ -805,9 +812,7 @@ export function DetalleEvaluacion({
             </p>
           )}
       </section>
-        </>
-      )}
-      <section className="seccion-evaluacion" hidden={pestanaActiva === 'docente' && paso !== 3}>
+      <section className="seccion-evaluacion" hidden={paso !== 3}>
         <div className="cabecera-detalle">
           <h2>Resultados y revisión docente</h2>
           <button

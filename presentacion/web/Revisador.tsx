@@ -148,18 +148,23 @@ export function Revisador() {
   const nodos: NodoAcademico[] = (anios || []).map((a) => ({
     id: a.id,
     nombre: String(a.anio),
+    tipo: 'anios_academicos',
     hijos: (a.facultades || []).map((f) => ({
       id: f.id,
       nombre: f.nombre || "",
+      tipo: 'facultades',
       hijos: (f.escuelas || []).map((e) => ({
         id: e.id,
         nombre: e.nombre || "",
+        tipo: 'escuelas',
         hijos: (e.promociones_ciclos || []).map((c) => ({
           id: c.id,
           nombre: c.denominacion || "",
+          tipo: 'promociones_ciclos',
           hijos: (c.cursos || []).map((curso) => ({
             id: curso.id,
             nombre: curso.nombre || "",
+            tipo: 'cursos',
           })),
         })),
       })),
@@ -250,6 +255,13 @@ export function Revisador() {
         }}
         alCrearEvaluacion={() => crear(true)}
         alOrganizar={() => organizar(true)}
+        alEliminarNodo={(nivel, id, nombre) => {
+          if (!window.confirm(`¿Eliminar «${nombre}»? Solo se puede eliminar si está vacío.`)) return;
+          void servicio.eliminarNodo(nivel, id).then(async () => {
+            if (activo === id) cambiarActivo(undefined);
+            await actualizar();
+          }).catch((problema) => mostrarError(problema instanceof Error ? problema.message : 'No se pudo eliminar.'));
+        }}
         alAbrirEvaluacion={abrirEvaluacion}
         alCerrarSesion={() => void salir()}
         alVerificarIA={verificar}
@@ -296,6 +308,7 @@ export function Revisador() {
         <NuevaEvaluacion
           servicio={servicio}
           cursos={cursos}
+          cursoInicial={cursos.some((curso) => curso.id === activo) ? activo : undefined}
           cerrar={cerrarNueva}
           alOrganizar={() => {
             crear(false);

@@ -28,6 +28,7 @@ interface Propiedades {
   alCalificarLote: (modo: "pendientes" | "todos" | "seleccionados", seleccionados?: string[]) => Promise<void>;
   ocupado: boolean;
   corriendo: boolean;
+  vista?: "completa" | "recepcion" | "revision";
 }
 
 export function RecepcionAlumnos({
@@ -39,6 +40,7 @@ export function RecepcionAlumnos({
   alCalificarLote,
   ocupado,
   corriendo,
+  vista = "completa",
 }: Propiedades) {
   const [copiado, cambiarCopiado] = usarEstado(false);
   const [copiadoMensaje, cambiarCopiadoMensaje] = usarEstado(false);
@@ -191,6 +193,7 @@ export function RecepcionAlumnos({
 
   return (
     <section aria-label="Recepción autónoma de alumnos" style={{ marginTop: "16px" }}>
+      {vista !== "revision" && <>
       {/* Tarjeta de Enlace Público y QR */}
       <div style={{ background: "#ffffff", border: "1px solid #e0e0e0", borderRadius: "8px", padding: "16px", marginBottom: "16px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "12px" }}>
@@ -377,9 +380,10 @@ export function RecepcionAlumnos({
         )}
       </div>
 
+      </>}
       {/* Resumen y Acciones de Calificación Flexible */}
       <div style={{ background: "#ffffff", border: "1px solid #e0e0e0", borderRadius: "8px", padding: "16px", marginBottom: "16px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "12px" }}>
+        {vista !== "recepcion" && <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "12px" }}>
           <div style={{ display: "flex", gap: "16px", fontSize: "0.88rem", color: "#3c4043" }}>
             <span><strong>Total entregados:</strong> {totalEntregados}</span>
             <span><strong>Calificados:</strong> {totalCompletados}</span>
@@ -421,7 +425,7 @@ export function RecepcionAlumnos({
               Revisar seleccionados ({seleccionados.length})
             </button>
           </div>
-        </div>
+        </div>}
 
         {/* Tabla de Entregas de Alumnos */}
         {totalEntregados === 0 ? (
@@ -431,7 +435,7 @@ export function RecepcionAlumnos({
               Esperando entregas de los estudiantes
             </p>
             <p style={{ margin: 0, fontSize: "0.85rem" }}>
-              Comparte el enlace o código QR. Los exámenes aparecerán aquí automáticamente en tiempo real.
+              Los exámenes recibidos aparecerán aquí.
             </p>
           </div>
         ) : (
@@ -439,7 +443,7 @@ export function RecepcionAlumnos({
             <table>
               <thead>
                 <tr>
-                  <th style={{ width: "40px", textAlign: "center" }}>
+                  {vista !== "recepcion" && <th style={{ width: "40px", textAlign: "center" }}>
                     <button
                       type="button"
                       className="boton-icono"
@@ -453,13 +457,12 @@ export function RecepcionAlumnos({
                         <CasillaVacia size={18} color="#5f6368" />
                       )}
                     </button>
-                  </th>
+                  </th>}
                   <th>Estudiante</th>
                   <th>Código</th>
                   <th>Entregas</th>
                   <th>Reenvío</th>
-                  <th>Nota</th>
-                  <th>Acción</th>
+                  {vista !== "recepcion" && <><th>Nota</th><th>Acción</th></>}
                 </tr>
               </thead>
               <tbody>
@@ -470,7 +473,7 @@ export function RecepcionAlumnos({
 
                   return (
                     <tr key={examen.id}>
-                      <td style={{ textAlign: "center" }}>
+                      {vista !== "recepcion" && <td style={{ textAlign: "center" }}>
                         <button
                           type="button"
                           className="boton-icono"
@@ -483,7 +486,7 @@ export function RecepcionAlumnos({
                             <CasillaVacia size={18} color="#5f6368" />
                           )}
                         </button>
-                      </td>
+                      </td>}
                       <td>
                         <strong>{examen.nombre_estudiante}</strong>
                       </td>
@@ -519,7 +522,7 @@ export function RecepcionAlumnos({
                           {tienePermisoReenvio ? "Reenvío permitido" : "Permitir reenvío"}
                         </button>
                       </td>
-                      <td>
+                      {vista !== "recepcion" && <><td>
                         {examen.estado_revision === "completado" ? (
                           <strong style={{ color: Number(examen.nota_final) >= 10.5 ? "#137333" : "#d93025" }}>
                             {Number(examen.nota_final).toFixed(2)}
@@ -539,7 +542,7 @@ export function RecepcionAlumnos({
                         >
                           <Ver size={14} /> Revisar
                         </button>
-                      </td>
+                      </td></>}
                     </tr>
                   );
                 })}

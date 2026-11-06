@@ -8,14 +8,16 @@ export function NuevaEvaluacion({
   cerrar,
   alCrear,
   alOrganizar,
+  cursoInicial,
 }: {
   servicio: ServicioBiblioteca;
   cursos: Curso[];
   cerrar: () => void;
   alCrear: (id: string) => void;
   alOrganizar?: () => void;
+  cursoInicial?: string;
 }) {
-  const [curso, cambiarCurso] = usarEstado(""),
+  const [curso, cambiarCurso] = usarEstado(cursoInicial || ""),
     [titulo, cambiarTitulo] = usarEstado(""),
     [indicaciones, cambiarIndicaciones] = usarEstado(""),
     [maximo, cambiarMaximo] = usarEstado("20"),
@@ -44,7 +46,7 @@ export function NuevaEvaluacion({
   return (
     <Ventana titulo="Nueva evaluación" cerrar={cerrar}>
       <form className="contenido-ventana" onSubmit={crear}>
-        <label>
+        {cursoInicial ? <p className="descripcion">Curso: <strong>{cursos.find((item) => item.id === cursoInicial)?.nombre}</strong></p> : <label>
           Curso
           <select
             required
@@ -58,7 +60,7 @@ export function NuevaEvaluacion({
               </option>
             ))}
           </select>
-        </label>
+        </label>}
         {!cursos.length && (
           <div style={{ margin: "10px 0", padding: "12px", background: "#f8f9fa", border: "1px solid #dadce0", borderRadius: "8px" }}>
             <p style={{ margin: "0 0 10px 0", fontSize: "14px", color: "#5f6368" }}>
